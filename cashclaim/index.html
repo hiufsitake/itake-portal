@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="logo.jpg" type="image/jpeg"> 
-
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -198,7 +198,11 @@
         }
 
         async function generatePDF(id) {
-            const data = currentClaims.find(p => p.id === id);
+            // Use loose equality (==) to handle ID type mismatch
+            const data = currentClaims.find(p => p.id == id);
+            
+            if (!data) { alert("Error: Claim data not found."); return; }
+
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
             const info = CO_DATA[data.company_key];
@@ -216,7 +220,7 @@
 
             // --- INFO TABLE ---
             doc.autoTable({
-                startY: 50, // Pushed down slightly to make room for Attn line
+                startY: 50, 
                 body: [
                     ['Claimant', data.claimant_name, 'Payable to', data.payable_name],
                     ['NRIC', data.claimant_nric, 'Project', data.project],
