@@ -205,13 +205,16 @@
             doc.setFont("helvetica", "bold").setFontSize(14).text(info.name, 14, 25);
             doc.setFontSize(8).setFont("helvetica", "normal").text(doc.splitTextToSize(HQ_ADDR, 100), 14, 30);
             
+            // --- ADDED ATTN LINE ---
+            doc.setFont("helvetica", "bold").text("Attn: Ir. Tian Foon Howe", 14, 42);
+
             // --- REFERENCE INFO ---
             doc.setFont("helvetica", "bold").text(`CASH CLAIM: ${data.claim_number}`, 130, 25);
             doc.text(`Date: ${new Date(data.submission_date).toLocaleDateString('en-GB')}`, 130, 30);
 
-            // --- INFO TABLE (ADDED BANK DETAILS ROW) ---
+            // --- INFO TABLE ---
             doc.autoTable({
-                startY: 45,
+                startY: 50, // Pushed down slightly to make room for Attn line
                 body: [
                     ['Claimant', data.claimant_name, 'Payable to', data.payable_name],
                     ['NRIC', data.claimant_nric, 'Project', data.project],
