@@ -201,8 +201,7 @@
             const doc = new jsPDF();
             const info = CO_DATA[data.company_key];
 
-            // --- HEADER (Logo Removed) ---
-            // Moved text up slightly to fill the gap
+            // --- HEADER ---
             doc.setFont("helvetica", "bold").setFontSize(14).text(info.name, 14, 25);
             doc.setFontSize(8).setFont("helvetica", "normal").text(doc.splitTextToSize(HQ_ADDR, 100), 14, 30);
             
@@ -210,17 +209,28 @@
             doc.setFont("helvetica", "bold").text(`CASH CLAIM: ${data.claim_number}`, 130, 25);
             doc.text(`Date: ${new Date(data.submission_date).toLocaleDateString('en-GB')}`, 130, 30);
 
+            // --- INFO TABLE (ADDED BANK DETAILS ROW) ---
             doc.autoTable({
                 startY: 45,
-                body: [['Claimant', data.claimant_name, 'Payable to', data.payable_name], ['NRIC', data.claimant_nric, 'Project', data.project]],
-                theme: 'plain', styles: { fontSize: 9, cellPadding: 1 }
+                body: [
+                    ['Claimant', data.claimant_name, 'Payable to', data.payable_name],
+                    ['NRIC', data.claimant_nric, 'Project', data.project],
+                    [{ content: 'Bank Info', styles: { fontStyle: 'bold' } }, { content: data.bank_details, colSpan: 3 }] 
+                ],
+                theme: 'plain', 
+                styles: { fontSize: 9, cellPadding: 1.5 },
+                columnStyles: { 0: { fontStyle: 'bold', width: 25 }, 2: { fontStyle: 'bold', width: 25 } }
             });
 
+            // --- ITEMS TABLE ---
             doc.autoTable({
                 startY: doc.lastAutoTable.finalY + 5,
                 head: [['No.', 'Description', 'Qty', 'Unit Price (RM)', 'Total RM']],
                 body: data.items.map((i, idx) => [idx+1, i.desc, i.qty, formatRM(i.price), formatRM(i.qty * i.price)]),
-                theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+                theme: 'grid', 
+                headStyles: { fillColor: [15, 23, 42] }, 
+                styles: { fontSize: 8 }, 
+                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
             });
 
             doc.setFont("helvetica", "bold").text(`TOTAL AMOUNT: RM ${formatRM(data.total_amount)}`, 196, doc.lastAutoTable.finalY + 10, { align: 'right' });
