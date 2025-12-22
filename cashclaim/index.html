@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="cclogo.jpg" type="image/jpeg"> 
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <title>ITAKE | Cash Claim</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .input-box { border: 2px solid #f1f5f9; padding: 1rem; border-radius: 1.25rem; background: #f8fafc; font-weight: 700; width: 100%; outline: none; transition: all 0.2s; }
+        .input-box:focus { border-color: #10b981; background: white; }
+        .tab-active { background: #10b981; color: white; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
+        .status-pending { background: #fef3c7; color: #92400e; }
+        .status-approved { background: #dcfce7; color: #166534; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen pb-24 text-slate-900 font-medium">
+
+    <nav class="bg-[#0f172a] text-white p-5 sticky top-0 z-50 shadow-xl border-b-2 border-emerald-600">
+        <div class="max-w-5xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <a href="../index.html" class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all"><i data-lucide="arrow-left" class="w-5 h-5"></i></a>
+                <h1 class="font-black italic text-xl uppercase tracking-tighter leading-none">ITAKE <span class="text-emerald-500 uppercase text-xs">Claim</span></h1>
+            </div>
+            <div class="flex bg-slate-800 p-1 rounded-xl gap-1 overflow-x-auto">
+                <button onclick="switchTab('create')" id="nav-create" class="px-3 py-2 rounded-lg text-[9px] font-bold tab-active uppercase transition-all">Create</button>
+                <button onclick="switchTab('review')" id="nav-review" class="px-3 py-2 rounded-lg text-[9px] font-bold text-slate-400 uppercase transition-all">Review</button>
+                <button onclick="switchTab('history')" id="nav-history" class="px-3 py-2 rounded-lg text-[9px] font-bold text-slate-400 uppercase transition-all">Archive</button>
+                <button onclick="switchTab('admin')" id="nav-admin" class="px-3 py-2 rounded-lg text-[9px] font-bold text-slate-400 uppercase transition-all">Admin</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto p-4 mt-6">
+        <div id="auth-lock-screen" class="hidden p-10 text-center bg-white rounded-[2.5rem] border shadow-sm space-y-4">
+            <i data-lucide="shield-check" class="w-12 h-12 mx-auto text-emerald-500"></i>
+            <h3 class="font-black text-lg uppercase italic text-slate-800">Management Authorization</h3>
+            <input type="password" id="master-pin-input" class="border-2 border-slate-100 p-4 rounded-2xl w-32 text-center text-2xl font-black bg-slate-50 focus:border-emerald-500 outline-none" placeholder="****">
+            <button onclick="checkMasterAuth()" class="block mx-auto bg-emerald-600 text-white px-10 py-4 rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg">Unlock</button>
+        </div>
+
+        <div id="tab-create">
+            <form id="claim-form" class="space-y-6">
+                <div class="grid md:grid-cols-2 gap-6">
+                    <section class="bg-white p-6 rounded-[2rem] shadow-sm border space-y-3">
+                        <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400 italic">Entity</h2>
+                        <select id="issuing-company" class="input-box text-emerald-600 uppercase italic">
+                            <option value="SOLUTIONS">ITAKE SOLUTIONS SDN. BHD.</option>
+                            <option value="OPTIMIZATION">ITAKE OPTIMIZATION SDN. BHD.</option>
+                            <option value="ENERGY">ITAKE ENERGY SDN. BHD.</option>
+                        </select>
+                        <input type="text" id="claim-no" class="input-box bg-slate-100 text-slate-500 font-black" readonly>
+                        <input type="date" id="claim-date" class="input-box" required>
+                    </section>
+                    <section class="bg-white p-6 rounded-[2rem] shadow-sm border space-y-3">
+                        <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400 italic">Claimant</h2>
+                        <input type="text" id="claimant-name" placeholder="Full Name" class="input-box" required>
+                        <input type="text" id="claimant-nric" placeholder="NRIC No." class="input-box" required>
+                        <input type="text" id="claimant-phone" placeholder="H/P No." class="input-box" required>
+                    </section>
+                </div>
+
+                <section class="bg-white p-6 rounded-[2rem] shadow-sm border space-y-3">
+                    <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400 italic">Payment Details</h2>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <input type="text" id="payable-name" placeholder="Payable to (Name)" class="input-box" required>
+                        <input type="text" id="project-name" placeholder="Project / Reference" class="input-box" required>
+                    </div>
+                    <textarea id="bank-details" placeholder="Bank Name & Account No." class="input-box" rows="2" required></textarea>
+                </section>
+
+                <section class="bg-white p-6 rounded-[2rem] shadow-sm border space-y-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400 italic">Expenditure Items</h2>
+                        <button type="button" onclick="addItemRow()" class="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-black text-[10px] uppercase flex items-center gap-1 shadow-sm"><i data-lucide="plus-circle" class="w-3 h-3"></i> Add Item</button>
+                    </div>
+                    <div id="items-list" class="space-y-3"></div>
+                </section>
+
+                <button type="submit" class="w-full bg-slate-900 text-white font-black p-6 rounded-[2.5rem] shadow-xl uppercase tracking-widest text-xs italic flex items-center justify-center gap-3">
+                    <i data-lucide="send" class="w-5 h-5"></i> Submit Claim
+                </button>
+            </form>
+        </div>
+
+        <div id="tab-review" class="hidden space-y-4"><div id="review-list" class="space-y-3"></div></div>
+        <div id="tab-history" class="hidden space-y-4"><div id="history-list" class="space-y-3"></div></div>
+
+        <div id="tab-admin" class="hidden space-y-4">
+            <section class="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-8 text-center">
+                <i data-lucide="settings" class="w-12 h-12 mx-auto text-slate-400"></i>
+                <button onclick="exportClaimsCSV()" class="w-full bg-slate-900 text-white p-5 rounded-3xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-3"><i data-lucide="download" class="w-5 h-5"></i> Export All Claims (CSV)</button>
+                <hr class="border-slate-100">
+                <div class="space-y-4">
+                    <h2 class="font-black text-slate-400 uppercase text-[9px] tracking-widest">Master PIN Reset</h2>
+                    <input type="password" id="new-master-pin" placeholder="Enter New 4-Digit PIN" class="input-box text-center text-2xl">
+                    <button onclick="updateMasterPin()" class="w-full bg-emerald-600 text-white p-4 rounded-2xl font-black uppercase text-[10px]">Save New PIN</button>
+                </div>
+                <button onclick="logoutGM()" class="w-full border-2 border-red-50 text-red-400 p-3 rounded-xl font-black uppercase text-[8px] tracking-widest">Lock Session</button>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const SUPABASE_URL = 'https://bszndksgqdvrblvtsmmr.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const HQ_ADDR = "Unit 906-3-04, Soon Hup Tower (2nd Floor), Jalan Maju, 98000 Miri, Sarawak, Malaysia.";
+        const CO_DATA = {
+            'SOLUTIONS': { name: 'ITAKE SOLUTIONS SDN. BHD.', reg: '201701003049 (1217199-M)', email: 'itakessb@gmail.com' },
+            'OPTIMIZATION': { name: 'ITAKE OPTIMIZATION SDN. BHD.', reg: '201901030485 (1339815-V)', email: 'itakeosb@gmail.com' },
+            'ENERGY': { name: 'ITAKE ENERGY SDN. BHD.', reg: '202501050305 (1651713-K)', email: 'itakeenergy@gmail.com' }
+        };
+
+        let currentClaims = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
+        const formatRM = (num) => num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        async function init() {
+            const { data } = await supabaseClient.from('settings').select('value').eq('key', 'pin').single();
+            if(data) masterPin = data.value;
+            addItemRow(); setAutoCCNumber(); lucide.createIcons();
+        }
+
+        async function setAutoCCNumber() {
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+            const { count } = await supabaseClient.from('cash_claims').select('*', { count: 'exact', head: true }).gte('created_at', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
+            document.getElementById('claim-no').value = `CC-${dateStr}-${String((count || 0) + 1).padStart(2, '0')}`;
+            document.getElementById('claim-date').value = now.toISOString().split('T')[0];
+        }
+
+        function switchTab(tab) {
+            const priv = ['review', 'admin'];
+            if(priv.includes(tab) && !isAuthorized) { targetTab = tab; document.querySelectorAll('main > div').forEach(d => d.classList.add('hidden')); document.getElementById('auth-lock-screen').classList.remove('hidden'); }
+            else { document.getElementById('auth-lock-screen').classList.add('hidden'); document.querySelectorAll('main > div').forEach(d => d.classList.toggle('hidden', d.id !== 'tab-' + tab)); if(tab === 'review' || tab === 'history') fetchRecords(); }
+            document.querySelectorAll('nav button').forEach(b => b.className = `px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all ${b.id === 'nav-'+tab ? 'tab-active' : 'text-slate-400'}`);
+            lucide.createIcons();
+        }
+
+        function checkMasterAuth() { if(document.getElementById('master-pin-input').value === masterPin) { isAuthorized = true; switchTab(targetTab); } else { alert("Unauthorized"); } }
+        function logoutGM() { isAuthorized = false; switchTab('create'); }
+
+        async function updateMasterPin() {
+            const newPin = document.getElementById('new-master-pin').value;
+            if(newPin.length === 4) { await supabaseClient.from('settings').update({ value: newPin }).eq('key', 'pin'); alert("PIN Updated"); logoutGM(); init(); }
+            else { alert("PIN must be 4 digits"); }
+        }
+
+        async function exportClaimsCSV() {
+            const { data } = await supabaseClient.from('cash_claims').select('*').order('created_at', { ascending: false });
+            const headers = ['Claim No', 'Date', 'Claimant', 'Payable To', 'Amount (RM)', 'Status', 'Approved By'];
+            const csvRows = [headers.join(',')];
+            data.forEach(cc => csvRows.push([cc.claim_number, cc.submission_date, `"${cc.claimant_name}"`, `"${cc.payable_name}"`, cc.total_amount.toFixed(2), cc.status, cc.approved_by || ''].join(',')));
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `ITAKE_Claims_Export.csv`; link.click();
+        }
+
+        async function fetchRecords() {
+            const { data } = await supabaseClient.from('cash_claims').select('*').order('created_at', { ascending: false });
+            currentClaims = data || [];
+            document.getElementById('review-list').innerHTML = currentClaims.filter(p => p.status === 'Pending').map(cc => `
+                <div class="bg-white p-6 rounded-[2rem] border shadow-sm space-y-4">
+                    <div class="flex justify-between items-start">
+                        <div><h3 class="font-black text-sm uppercase">${cc.claim_number}</h3><p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">${cc.claimant_name} | RM ${formatRM(cc.total_amount)}</p></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="approver-${cc.id}" class="bg-slate-50 border-none rounded-xl px-4 py-2 text-[10px] font-bold"><option value="HFS">Approve as HFS</option><option value="TFH">Approve as TFH</option></select>
+                        <button onclick="approveClaim('${cc.id}')" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Confirm Approval</button>
+                    </div>
+                </div>
+            `).join('') || '<div class="text-center p-10 text-slate-300 italic text-xs">Queue Clear</div>';
+
+            document.getElementById('history-list').innerHTML = currentClaims.map(cc => `
+                <div class="bg-white p-5 rounded-[2rem] border shadow-sm flex justify-between items-center group">
+                    <div><h3 class="font-black text-slate-800 text-sm tracking-tight">${cc.claim_number}</h3><p class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">${cc.claimant_name} | RM ${formatRM(cc.total_amount)}</p></div>
+                    <div class="flex items-center gap-2">
+                        <div class="status-${cc.status.toLowerCase()} px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">${cc.status}</div>
+                        ${cc.status === 'Approved' ? `<button onclick="generatePDF('${cc.id}')" class="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}
+                        <button onclick="deleteClaim('${cc.id}')" class="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        async function approveClaim(id) { 
+            const approver = document.getElementById('approver-'+id).value;
+            await supabaseClient.from('cash_claims').update({ status: 'Approved', approved_by: approver }).eq('id', id);
+            fetchRecords(); 
+        }
+
+        async function generatePDF(id) {
+            const data = currentClaims.find(p => p.id === id);
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const info = CO_DATA[data.company_key];
+
+            // --- HEADER ---
+            doc.setFont("helvetica", "bold").setFontSize(14).text(info.name, 14, 25);
+            doc.setFontSize(8).setFont("helvetica", "normal").text(doc.splitTextToSize(HQ_ADDR, 100), 14, 30);
+            
+            // --- ADDED ATTN LINE ---
+            doc.setFont("helvetica", "bold").text("Attn: Ir. Tian Foon Howe", 14, 42);
+
+            // --- REFERENCE INFO ---
+            doc.setFont("helvetica", "bold").text(`CASH CLAIM: ${data.claim_number}`, 130, 25);
+            doc.text(`Date: ${new Date(data.submission_date).toLocaleDateString('en-GB')}`, 130, 30);
+
+            // --- INFO TABLE ---
+            doc.autoTable({
+                startY: 50, // Pushed down slightly to make room for Attn line
+                body: [
+                    ['Claimant', data.claimant_name, 'Payable to', data.payable_name],
+                    ['NRIC', data.claimant_nric, 'Project', data.project],
+                    [{ content: 'Bank Info', styles: { fontStyle: 'bold' } }, { content: data.bank_details, colSpan: 3 }] 
+                ],
+                theme: 'plain', 
+                styles: { fontSize: 9, cellPadding: 1.5 },
+                columnStyles: { 0: { fontStyle: 'bold', width: 25 }, 2: { fontStyle: 'bold', width: 25 } }
+            });
+
+            // --- ITEMS TABLE ---
+            doc.autoTable({
+                startY: doc.lastAutoTable.finalY + 5,
+                head: [['No.', 'Description', 'Qty', 'Unit Price (RM)', 'Total RM']],
+                body: data.items.map((i, idx) => [idx+1, i.desc, i.qty, formatRM(i.price), formatRM(i.qty * i.price)]),
+                theme: 'grid', 
+                headStyles: { fillColor: [15, 23, 42] }, 
+                styles: { fontSize: 8 }, 
+                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
+            });
+
+            doc.setFont("helvetica", "bold").text(`TOTAL AMOUNT: RM ${formatRM(data.total_amount)}`, 196, doc.lastAutoTable.finalY + 10, { align: 'right' });
+
+            // --- FOOTER WITH TIMESTAMP ---
+            const printDate = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+            
+            doc.setFontSize(9).setFont("helvetica", "italic");
+            doc.text(`This Cash Claim is digitally approved by ${data.approved_by} on ${printDate}.`, 14, doc.lastAutoTable.finalY + 25);
+            doc.text(`No signature is required.`, 14, doc.lastAutoTable.finalY + 30);
+            
+            doc.save(`${data.claim_number}.pdf`);
+        }
+
+        function addItemRow() {
+            const container = document.getElementById('items-list');
+            const div = document.createElement('div');
+            div.className = 'item-row grid grid-cols-12 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 items-center';
+            div.innerHTML = `<input type="text" placeholder="Description" class="col-span-8 bg-transparent font-bold text-[11px] outline-none" required><input type="number" placeholder="Qty" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center" required><input type="number" step="0.01" placeholder="Price" class="col-span-2 bg-transparent font-bold text-[11px] outline-none text-right" required><button type="button" onclick="this.parentElement.remove()" class="col-span-1 text-red-300 hover:text-red-600 flex justify-center"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`;
+            container.appendChild(div);
+            lucide.createIcons();
+        }
+
+        async function deleteClaim(id) { if(confirm("Delete record?")) { await supabaseClient.from('cash_claims').delete().eq('id', id); fetchRecords(); } }
+
+        document.getElementById('claim-form').onsubmit = async function(e) {
+            e.preventDefault();
+            const items = []; let sub = 0;
+            document.querySelectorAll('.item-row').forEach(row => {
+                const f = row.querySelectorAll('input'); const qty = parseFloat(f[1].value), pr = parseFloat(f[2].value);
+                sub += (qty * pr); items.push({ desc: f[0].value, qty, price: pr });
+            });
+            const payload = { 
+                claim_number: document.getElementById('claim-no').value, 
+                company_key: document.getElementById('issuing-company').value, 
+                company_name: CO_DATA[document.getElementById('issuing-company').value].name, 
+                submission_date: document.getElementById('claim-date').value, 
+                claimant_name: document.getElementById('claimant-name').value, 
+                claimant_nric: document.getElementById('claimant-nric').value, 
+                claimant_phone: document.getElementById('claimant-phone').value, 
+                payable_name: document.getElementById('payable-name').value, 
+                bank_details: document.getElementById('bank-details').value, 
+                project: document.getElementById('project-name').value, 
+                items: items, total_amount: sub, status: 'Pending' 
+            };
+            const { error } = await supabaseClient.from('cash_claims').insert(payload);
+            if(!error) { alert("Claim Submitted"); location.reload(); } else { alert("Error: " + error.message); }
+        };
+
+        init();
+    </script>
+</body>
+</html>
