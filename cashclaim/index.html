@@ -111,7 +111,6 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        const LOGO_FILENAME = "../logo.jpg"; 
         const HQ_ADDR = "Unit 906-3-04, Soon Hup Tower (2nd Floor), Jalan Maju, 98000 Miri, Sarawak, Malaysia.";
         const CO_DATA = {
             'SOLUTIONS': { name: 'ITAKE SOLUTIONS SDN. BHD.', reg: '201701003049 (1217199-M)', email: 'itakessb@gmail.com' },
@@ -202,22 +201,17 @@
             const doc = new jsPDF();
             const info = CO_DATA[data.company_key];
 
-            try { 
-                const img = new Image(); img.src = LOGO_FILENAME;
-                await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
-                if(img.complete && img.naturalWidth !== 0) {
-                    const pdfWidth = 35; const pdfHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth;
-                    doc.addImage(img, 'JPEG', 14, 10, pdfWidth, pdfHeight); 
-                }
-            } catch(e) {}
-
-            doc.setFont("helvetica", "bold").setFontSize(14).text(info.name, 14, 38);
-            doc.setFontSize(8).setFont("helvetica", "normal").text(doc.splitTextToSize(HQ_ADDR, 100), 14, 43);
-            doc.setFont("helvetica", "bold").text(`CASH CLAIM: ${data.claim_number}`, 130, 38);
-            doc.text(`Date: ${new Date(data.submission_date).toLocaleDateString('en-GB')}`, 130, 43);
+            // --- HEADER (Logo Removed) ---
+            // Moved text up slightly to fill the gap
+            doc.setFont("helvetica", "bold").setFontSize(14).text(info.name, 14, 25);
+            doc.setFontSize(8).setFont("helvetica", "normal").text(doc.splitTextToSize(HQ_ADDR, 100), 14, 30);
+            
+            // --- REFERENCE INFO ---
+            doc.setFont("helvetica", "bold").text(`CASH CLAIM: ${data.claim_number}`, 130, 25);
+            doc.text(`Date: ${new Date(data.submission_date).toLocaleDateString('en-GB')}`, 130, 30);
 
             doc.autoTable({
-                startY: 55,
+                startY: 45,
                 body: [['Claimant', data.claimant_name, 'Payable to', data.payable_name], ['NRIC', data.claimant_nric, 'Project', data.project]],
                 theme: 'plain', styles: { fontSize: 9, cellPadding: 1 }
             });
@@ -230,7 +224,14 @@
             });
 
             doc.setFont("helvetica", "bold").text(`TOTAL AMOUNT: RM ${formatRM(data.total_amount)}`, 196, doc.lastAutoTable.finalY + 10, { align: 'right' });
-            doc.setFontSize(9).setFont("helvetica", "italic").text(`This Cash Claim is digitally approved by ${data.approved_by}. No signature is required.`, 14, doc.lastAutoTable.finalY + 25);
+
+            // --- FOOTER WITH TIMESTAMP ---
+            const printDate = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+            
+            doc.setFontSize(9).setFont("helvetica", "italic");
+            doc.text(`This Cash Claim is digitally approved by ${data.approved_by} on ${printDate}.`, 14, doc.lastAutoTable.finalY + 25);
+            doc.text(`No signature is required.`, 14, doc.lastAutoTable.finalY + 30);
+            
             doc.save(`${data.claim_number}.pdf`);
         }
 
