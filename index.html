@@ -124,6 +124,7 @@
 
         let isLoginMode = true;
 
+        // Listen for Login events
         supabaseClient.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN') {
                 showDashboard();
@@ -132,10 +133,11 @@
             }
         });
 
-        async function checkSession() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) showDashboard();
-            else showAuth();
+        // REPLACED: checkSession() with initPortal()
+        // This function ensures the user is logged out when they load the page.
+        async function initPortal() {
+            await supabaseClient.auth.signOut(); // Force logout on load
+            showAuth(); // Show login screen
         }
 
         function showDashboard() {
@@ -216,10 +218,11 @@
 
         async function handleLogout() {
             await supabaseClient.auth.signOut();
+            window.location.reload(); // Refresh page on logout to reset state
         }
 
         lucide.createIcons();
-        checkSession();
+        initPortal(); // Run initialization
     </script>
 </body>
 </html>
