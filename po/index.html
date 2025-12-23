@@ -140,8 +140,6 @@
         const EMAILJS_PUBLIC_KEY = "mAu312S8UzSdtFZuk";  
         const EMAILJS_SERVICE_ID = "service_0r59w66";  
         const EMAILJS_NEW_REQ_TEMPLATE_ID = "template_ykwi7br"; 
-        
-        // Use your specific template ID for status updates
         const EMAILJS_STATUS_TEMPLATE_ID = "template_bzgidhw"; 
 
         let currentPOs = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
@@ -221,30 +219,26 @@
             lucide.createIcons();
         }
 
-        // --- UPDATED STATUS FUNCTION WITH COLOR LOGIC ---
+        // --- UPDATED: Sends "header_bg" to control email color ---
         async function updatePOStatus(id, newStatus) {
             const approver = document.getElementById('approver-'+id).value;
             const poData = currentPOs.find(p => p.id === id);
-
-            // 1. Update Database
             const { error } = await supabaseClient.from('po_logs').update({ status: newStatus, approved_by: approver }).eq('id', id);
 
             if (!error && poData) {
-                // Determine color: Green for Approved, Red for Rejected
+                // Color Logic: Green for Approved, Red for Rejected
                 const colorCode = newStatus === 'Approved' ? '#10b981' : '#dc2626';
 
-                // 2. Send Confirmation Email with Color
                 const emailParams = {
                     po_number: poData.po_number,
                     company: poData.company_name,
                     amount: formatRM(poData.total_amount),
                     approver: approver,
                     status: newStatus,
-                    header_bg: colorCode // Pass the color to the template
+                    header_bg: colorCode // Sends color to Template
                 };
                 
                 emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_STATUS_TEMPLATE_ID, emailParams);
-
                 alert(`PO ${newStatus} Successfully`);
                 fetchRecords();
             } else {
@@ -278,93 +272,4 @@
             const poY = 45 + addrHeight;
             doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
             doc.setFontSize(10).text(`PO Number: ${data.po_number}`, 130, poY);
-            doc.text(`Date: ${data.po_date}`, 130, poY + 6);
-            doc.text("Supplier:", 14, poY + 16); doc.setFont("helvetica", "normal").text(data.supplier_name, 35, poY + 16);
-            doc.setFont("helvetica", "bold").text("Address:", 14, poY + 22); doc.setFont("helvetica", "normal").text(doc.splitTextToSize(data.supplier_address, 80), 35, poY + 22);
-
-            const head = info.sst ? [['No.', 'Item Description', 'Qty', 'Unit', 'Price (RM)', 'SST%', 'SST RM', 'Total (RM)']] : [['No.', 'Description', 'Qty', 'Unit', 'Price (RM)', 'Total (RM)']];
-            const body = data.items.map((i, idx) => {
-                const amt = i.qty * i.price; const sstVal = amt * (i.sst/100);
-                return info.sst ? [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), i.sst+"%", formatRM(sstVal), formatRM(amt+sstVal)] : [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), formatRM(amt)];
-            });
-            doc.autoTable({ startY: poY + 38, head, body, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, columnStyles: { 4: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } } });
-            
-            doc.setFont("helvetica", "bold").setFontSize(11).text(`TOTAL (RM): ${formatRM(data.total_amount)}`, 196, doc.lastAutoTable.finalY + 10, { align: 'right' });
-            
-            const now = new Date();
-            const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
-            const dateStr = now.toLocaleDateString('en-GB');
-
-            doc.setFontSize(9).setFont("helvetica", "italic");
-            doc.text(`This PO is digitally approved by ${data.approved_by} on ${dateStr} @ ${timeStr}hours, no signature is required.`, 14, doc.lastAutoTable.finalY + 30);
-            
-            doc.save(`${data.po_number}.pdf`);
-        }
-
-        function checkMasterAuth() { if(document.getElementById('master-pin-input').value === masterPin) { isAuthorized = true; switchTab(targetTab); } else { alert("Unauthorized"); } }
-        function logoutGM() { isAuthorized = false; switchTab('create'); }
-        async function updateMasterPin() {
-            const newPin = document.getElementById('new-master-pin').value;
-            if(newPin.length === 4) { await supabaseClient.from('settings').update({ value: newPin }).eq('key', 'pin'); alert("PIN Updated"); logoutGM(); init(); }
-        }
-
-        async function deletePO(id) { if(confirm("Delete record?")) { await supabaseClient.from('po_logs').delete().eq('id', id); fetchRecords(); } }
-        function addItemRow() { const container = document.getElementById('items-list'); const div = document.createElement('div'); div.className = 'item-row grid grid-cols-12 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 items-center'; div.innerHTML = `<input type="text" placeholder="Description" class="col-span-5 bg-transparent font-bold text-[11px] outline-none" required><input type="number" placeholder="Qty" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center" required><input type="text" placeholder="Unit" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center"><input type="number" step="0.01" placeholder="Price" class="col-span-2 bg-transparent font-bold text-[11px] outline-none text-center" required><input type="number" step="0.1" placeholder="%" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center sst-col ${CO_DATA[document.getElementById('issuing-company').value].sst ? '' : 'sst-hidden'}"><button type="button" onclick="this.parentElement.remove()" class="col-span-2 text-red-300 hover:text-red-600 flex justify-center"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`; container.appendChild(div); lucide.createIcons(); }
-        function toggleSSTFields() { const isSST = CO_DATA[document.getElementById('issuing-company').value].sst; document.querySelectorAll('.sst-col').forEach(el => el.classList.toggle('sst-hidden', !isSST)); }
-
-        // --- SUBMIT FUNCTION ---
-        document.getElementById('po-form').onsubmit = async function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('submit-btn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = 'Submitting...';
-            btn.disabled = true;
-
-            const items = []; let sub = 0, tax = 0;
-            document.querySelectorAll('.item-row').forEach(row => {
-                const f = row.querySelectorAll('input'); const qty = parseFloat(f[1].value), pr = parseFloat(f[3].value), amt = qty * pr, sstP = parseFloat(f[4].value || 0);
-                sub += amt; tax += (amt * sstP / 100); items.push({ desc: f[0].value, qty, unit: f[2].value, price: pr, sst: sstP });
-            });
-            const payload = { po_number: document.getElementById('po-no').value, po_date: document.getElementById('po-date').value, company_key: document.getElementById('issuing-company').value, company_name: CO_DATA[document.getElementById('issuing-company').value].name, supplier_name: document.getElementById('supplier-name').value, supplier_address: document.getElementById('supplier-address').value, items: items, total_amount: sub + tax, status: 'Pending' };
-            
-            const { error } = await supabaseClient.from('po_logs').insert(payload);
-
-            if (!error) {
-                const emailParams = {
-                    po_number: payload.po_number,
-                    company: payload.company_name,
-                    supplier: payload.supplier_name,
-                    amount: formatRM(payload.total_amount),
-                    portal_link: window.location.origin + "/index.html" 
-                };
-
-                emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_NEW_REQ_TEMPLATE_ID, emailParams)
-                    .then(function() {
-                        alert("PO Submitted & Email Notification Sent!");
-                        resetForm();
-                    }, function(error) {
-                        alert("PO Saved, but Email Failed: " + JSON.stringify(error));
-                        resetForm();
-                    });
-            } else {
-                alert("Database Error: " + error.message);
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }
-        };
-
-        function resetForm() {
-            document.getElementById('po-form').reset(); 
-            document.getElementById('items-list').innerHTML = ''; 
-            addItemRow(); 
-            setAutoPONumber();
-            const btn = document.getElementById('submit-btn');
-            btn.innerHTML = '<i data-lucide="send" class="w-5 h-5"></i> Submit PO & Send Email';
-            btn.disabled = false;
-            lucide.createIcons();
-        }
-
-        init();
-    </script>
-</body>
-</html>
+            doc.text(`Date: ${data.po_date}`,
