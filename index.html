@@ -14,40 +14,19 @@
         body { 
             font-family: 'Inter', sans-serif; 
             -webkit-tap-highlight-color: transparent; 
-            opacity: 0; /* Hide body initially to prevent glitch */
-            transition: opacity 0.3s ease-in-out;
+            opacity: 0; 
+            transition: opacity 0.2s ease-in-out;
         }
-        body.loaded { opacity: 1; } /* Show body once ready */
-        
-        .input-box { 
-            border: 2px solid #f1f5f9; 
-            padding: 1rem; 
-            border-radius: 1.25rem; 
-            background: #f8fafc; 
-            font-weight: 700; 
-            width: 100%; 
-            outline: none; 
-            transition: all 0.2s; 
-        }
+        body.loaded { opacity: 1; }
+        .input-box { border: 2px solid #f1f5f9; padding: 1rem; border-radius: 1.25rem; background: #f8fafc; font-weight: 700; width: 100%; outline: none; transition: all 0.2s; }
         .input-box:focus { border-color: #10b981; background: white; }
-
-        .nav-card { 
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
-            border: 2px solid #f8fafc;
-            background: #ffffff;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        }
-        .nav-card:hover { 
-            border-color: #10b981; 
-            transform: translateY(-3px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
+        .nav-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid #f8fafc; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .nav-card:hover { border-color: #10b981; transform: translateY(-3px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
     </style>
 </head>
 <body class="bg-white min-h-screen flex flex-col items-center justify-center p-6">
 
     <div class="w-full max-w-md space-y-12 text-center">
-        
         <div class="flex flex-col items-center">
             <img src="logo.jpg" alt="ITAKE Logo" class="w-64 md:w-80 h-auto object-contain mb-4">
             <div class="h-1 w-12 bg-emerald-500 rounded-full mb-2"></div>
@@ -63,164 +42,87 @@
                 <input type="email" id="email" placeholder="Email Address" class="input-box" required>
                 <input type="password" id="password" placeholder="Password" class="input-box" required>
             </div>
-            <div class="flex justify-center items-center px-1">
-                <button onclick="toggleAuthMode()" id="toggle-auth-btn" class="text-[10px] font-bold text-slate-400 hover:text-emerald-600 uppercase tracking-widest transition-colors">Create Account</button>
-            </div>
-            <button onclick="handleAuth()" id="submit-btn" class="w-full bg-slate-900 text-white font-black p-5 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all">
-                Login
-            </button>
+            <button onclick="handleAuth()" id="submit-btn" class="w-full bg-slate-900 text-white font-black p-5 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all">Login</button>
             <p id="error-msg" class="text-red-500 text-xs font-bold hidden bg-red-50 p-3 rounded-xl"></p>
-            <p id="success-msg" class="text-emerald-600 text-xs font-bold hidden bg-emerald-50 p-3 rounded-xl"></p>
         </div>
 
         <div id="dashboard-view" class="hidden space-y-6">
             <div class="grid gap-5">
-                <a href="po/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6">
-                    <div class="bg-emerald-500 text-white p-4 rounded-2xl shadow-lg shadow-emerald-200">
-                        <i data-lucide="shopping-cart" class="w-6 h-6"></i>
-                    </div>
-                    <div class="text-left">
-                        <h2 class="font-black uppercase italic text-slate-800 text-lg tracking-tight">PO System</h2>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Procurement & SST</p>
-                    </div>
+                <a href="po/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
+                    <div class="bg-emerald-500 text-white p-4 rounded-2xl"><i data-lucide="shopping-cart"></i></div>
+                    <div><h2 class="font-black uppercase italic text-slate-800 text-lg">PO System</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Procurement & SST</p></div>
                 </a>
-                <a href="cashclaim/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6">
-                    <div class="bg-blue-500 text-white p-4 rounded-2xl shadow-lg shadow-blue-200">
-                        <i data-lucide="wallet" class="w-6 h-6"></i>
-                    </div>
-                    <div class="text-left">
-                        <h2 class="font-black uppercase italic text-slate-800 text-lg tracking-tight">Cash Claim</h2>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expenses & Claims</p>
-                    </div>
+                <a href="cashclaim/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
+                    <div class="bg-blue-500 text-white p-4 rounded-2xl"><i data-lucide="wallet"></i></div>
+                    <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Cash Claim</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expenses & Claims</p></div>
                 </a>
-                <a href="leave/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6">
-                    <div class="bg-slate-900 text-white p-4 rounded-2xl shadow-lg shadow-slate-200">
-                        <i data-lucide="calendar" class="w-6 h-6"></i>
-                    </div>
-                    <div class="text-left">
-                        <h2 class="font-black uppercase italic text-slate-800 text-lg tracking-tight">Leave System</h2>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Staff Attendance</p>
-                    </div>
+                <a href="leave/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
+                    <div class="bg-slate-900 text-white p-4 rounded-2xl"><i data-lucide="calendar"></i></div>
+                    <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Leave System</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Staff Attendance</p></div>
                 </a>
             </div>
-            <button onclick="handleLogout()" class="text-[10px] font-bold text-red-300 hover:text-red-500 uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto pt-4">
+            <button onclick="handleLogout()" class="text-[10px] font-bold text-red-300 hover:text-red-500 uppercase tracking-widest flex items-center justify-center gap-2 mx-auto pt-4">
                 <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
             </button>
         </div>
 
-        <footer class="pt-10">
-            <p class="text-[9px] font-black uppercase tracking-[0.6em] text-slate-300">
-                ITAKE GROUP
-            </p>
-        </footer>
+        <footer class="pt-10"><p class="text-[9px] font-black uppercase tracking-[0.6em] text-slate-300">ITAKE GROUP</p></footer>
     </div>
 
     <script>
         const SUPABASE_URL = 'https://bszndksgqdvrblvtsmmr.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
-        
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        let isLoginMode = true;
 
-        // Auto Sign-out when tab or browser is closed
-        window.addEventListener('beforeunload', () => {
-            supabaseClient.auth.signOut();
-        });
+        // LOGIC: Check if this tab has an active session
+        // sessionStorage is deleted automatically when the tab is closed
+        async function initPortal() {
+            const tabActive = sessionStorage.getItem('itake_tab_session');
+            const { data: { session } } = await supabaseClient.auth.getSession();
+
+            if (!tabActive && session) {
+                // If the tab is fresh but a session exists in localStorage, kill it
+                await supabaseClient.auth.signOut();
+                showAuth();
+            } else if (session) {
+                showDashboard();
+            } else {
+                showAuth();
+            }
+            document.body.classList.add('loaded');
+        }
 
         supabaseClient.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN') {
+                sessionStorage.setItem('itake_tab_session', 'true');
                 showDashboard();
             } else if (event === 'SIGNED_OUT') {
+                sessionStorage.removeItem('itake_tab_session');
                 showAuth();
             }
         });
 
-        // Forced logout logic handled seamlessly
-        async function initPortal() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) {
-                await supabaseClient.auth.signOut();
-            }
-            showAuth();
-            // Show body only after signOut check is done to avoid glitch
-            document.body.classList.add('loaded');
-        }
-
         function showDashboard() {
-            hideAll();
+            document.getElementById('auth-view').classList.add('hidden');
             document.getElementById('dashboard-view').classList.remove('hidden');
-            document.body.classList.add('loaded'); // Ensure shown
         }
 
         function showAuth() {
-            hideAll();
-            document.getElementById('auth-view').classList.remove('hidden');
-            document.body.classList.add('loaded'); // Ensure shown
-        }
-
-        function hideAll() {
-            document.getElementById('auth-view').classList.add('hidden');
             document.getElementById('dashboard-view').classList.add('hidden');
-        }
-
-        function toggleAuthMode() {
-            isLoginMode = !isLoginMode;
-            const title = document.getElementById('auth-title');
-            const sub = document.getElementById('auth-subtitle');
-            const btn = document.getElementById('submit-btn');
-            const toggleBtn = document.getElementById('toggle-auth-btn');
-            
-            document.getElementById('error-msg').classList.add('hidden');
-            document.getElementById('success-msg').classList.add('hidden');
-
-            if (isLoginMode) {
-                title.innerText = "Welcome";
-                sub.innerText = "Please login to access the system.";
-                btn.innerText = "Login";
-                toggleBtn.innerText = "Create Account";
-            } else {
-                title.innerText = "New Account";
-                sub.innerText = "Enter details to register.";
-                btn.innerText = "Sign Up";
-                toggleBtn.innerText = "Back to Login";
-            }
+            document.getElementById('auth-view').classList.remove('hidden');
         }
 
         async function handleAuth() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const btn = document.getElementById('submit-btn');
-            const errMsg = document.getElementById('error-msg');
-            const successMsg = document.getElementById('success-msg');
+            if (!email || !password) return;
 
-            if (!email || !password) {
-                errMsg.innerText = "Please enter both email and password.";
-                errMsg.classList.remove('hidden');
-                return;
-            }
-
-            errMsg.classList.add('hidden');
-            successMsg.classList.add('hidden');
-            const originalText = btn.innerText;
             btn.innerHTML = '<span class="animate-pulse">Processing...</span>';
-
-            if (isLoginMode) {
-                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) {
-                    errMsg.innerText = error.message;
-                    errMsg.classList.remove('hidden');
-                    btn.innerText = originalText;
-                }
-            } else {
-                const { error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) {
-                    errMsg.innerText = error.message;
-                    errMsg.classList.remove('hidden');
-                } else {
-                    successMsg.innerText = "Account created! Please check your email.";
-                    successMsg.classList.remove('hidden');
-                }
-                btn.innerText = originalText;
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                alert(error.message);
+                btn.innerText = "Login";
             }
         }
 
@@ -229,7 +131,6 @@
             window.location.reload(); 
         }
 
-        // Initialize
         lucide.createIcons();
         initPortal(); 
     </script>
