@@ -124,6 +124,11 @@
 
         let isLoginMode = true;
 
+        // Auto Sign-out when tab or browser is closed
+        window.addEventListener('beforeunload', () => {
+            supabaseClient.auth.signOut();
+        });
+
         supabaseClient.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN') {
                 showDashboard();
@@ -132,10 +137,10 @@
             }
         });
 
-        async function checkSession() {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (session) showDashboard();
-            else showAuth();
+        // Forced logout on every access to the hub
+        async function initPortal() {
+            await supabaseClient.auth.signOut();
+            showAuth();
         }
 
         function showDashboard() {
@@ -216,10 +221,11 @@
 
         async function handleLogout() {
             await supabaseClient.auth.signOut();
+            window.location.reload(); 
         }
 
         lucide.createIcons();
-        checkSession();
+        initPortal(); 
     </script>
 </body>
 </html>
