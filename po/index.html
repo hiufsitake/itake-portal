@@ -4,15 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="ilogopo.PNG" type="image/PNG"> 
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-    
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
-
     <title>ITAKE | PO</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
@@ -23,7 +20,6 @@
         .status-pending { background: #fef3c7; color: #92400e; }
         .status-approved { background: #dcfce7; color: #166534; }
         .status-rejected { background: #fee2e2; color: #991b1b; }
-        .sst-hidden { display: none !important; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen pb-24 text-slate-900 font-medium">
@@ -55,7 +51,7 @@
             <form id="po-form" class="space-y-6">
                 <section class="bg-white p-6 rounded-[2.5rem] shadow-sm border space-y-4">
                     <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400">Issuing Company</h2>
-                    <select id="issuing-company" onchange="toggleSSTFields()" class="input-box text-emerald-600 uppercase italic">
+                    <select id="issuing-company" class="input-box text-emerald-600 uppercase italic">
                         <option value="SOLUTIONS">ITAKE SOLUTIONS SDN. BHD.</option>
                         <option value="OPTIMIZATION">ITAKE OPTIMIZATION SDN. BHD.</option>
                         <option value="ENERGY">ITAKE ENERGY SDN. BHD.</option>
@@ -81,6 +77,10 @@
                         <button type="button" onclick="addItemRow()" class="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl font-black text-[10px] uppercase flex items-center gap-1 shadow-sm"><i data-lucide="plus-circle" class="w-3 h-3"></i> Add Item</button>
                     </div>
                     <div id="items-list" class="space-y-3"></div>
+                    <div class="text-right pt-4 border-t">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Grand Total</p>
+                        <h2 class="text-3xl font-black text-emerald-600" id="grand-total-display">RM 0.00</h2>
+                    </div>
                 </section>
 
                 <button type="submit" id="submit-btn" class="w-full bg-slate-900 text-white font-black p-6 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs italic flex items-center justify-center gap-3">
@@ -104,28 +104,30 @@
                     <h2 class="font-black text-slate-800 uppercase text-sm italic">Data Management</h2>
                     <p class="text-[10px] text-slate-400 font-bold uppercase">Export all PO records to CSV for accounting</p>
                 </div>
-                
                 <button onclick="exportToCSV()" class="w-full bg-slate-900 text-white p-5 rounded-3xl font-black uppercase text-xs tracking-[0.2em] shadow-lg flex items-center justify-center gap-3">
                     <i data-lucide="download" class="w-5 h-5"></i> Export Database (CSV)
                 </button>
-
                 <hr class="border-slate-100">
-
                 <div class="space-y-4">
                     <h2 class="font-black text-slate-400 uppercase text-[9px] tracking-widest">Master PIN Security</h2>
                     <input type="password" id="new-master-pin" placeholder="New 4-Digit PIN" class="input-box text-center text-2xl">
                     <button onclick="updateMasterPin()" class="w-full bg-emerald-600 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">Update System PIN</button>
                 </div>
-
                 <button onclick="logoutGM()" class="w-full border-2 border-red-50 text-red-400 p-3 rounded-xl font-black uppercase text-[8px] tracking-widest">Lock Admin Session</button>
             </section>
         </div>
     </main>
 
     <script>
+        // CONFIG
         const SUPABASE_URL = 'https://bszndksgqdvrblvtsmmr.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // EMAILJS CONFIG
+        const EMAIL_SERVICE = "service_0r59w66";
+        const EMAIL_TEMPLATE = "template_0ml31p9"; // Universal
+        const EMAIL_KEY = "mAu312S8UzSdtFZuk";
 
         const LOGO_FILENAME = "logo.jpg";
         const HQ_ADDR = "Unit 906-3-04, Soon Hup Tower (2nd Floor), Jalan Maju, 98000 Miri, Sarawak, Malaysia.";
@@ -136,17 +138,12 @@
             'ENERGY': { name: 'ITAKE ENERGY SDN. BHD.', reg: '202501050305 (1651713-K)', email: 'itakeenergy@gmail.com', sst: false }
         };
 
-        // --- EMAILJS CONFIGURATION ---
-        const EMAILJS_PUBLIC_KEY = "mAu312S8UzSdtFZuk";  
-        const EMAILJS_SERVICE_ID = "service_0r59w66";  
-        const EMAILJS_NEW_REQ_TEMPLATE_ID = "template_ykwi7br"; 
-        const EMAILJS_STATUS_TEMPLATE_ID = "template_bzgidhw"; 
-
-        let currentPOs = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
+        let currentPOs = [], isAuthorized = false, masterPin = '1234';
         const formatRM = (num) => num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const createRow = (label, value) => `<tr><td style="padding: 8px 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase;">${label}</td><td style="padding: 8px 0; color: #0f172a; font-size: 14px; font-weight: bold; text-align: right;">${value}</td></tr><tr><td colspan="2" style="border-bottom: 1px solid #f1f5f9;"></td></tr>`;
 
         async function init() {
-            emailjs.init(EMAILJS_PUBLIC_KEY);
+            emailjs.init(EMAIL_KEY);
             const { data } = await supabaseClient.from('settings').select('value').eq('key', 'pin').single();
             if(data) masterPin = data.value;
             addItemRow();
@@ -154,17 +151,55 @@
             lucide.createIcons();
         }
 
-        async function exportToCSV() {
-            if (currentPOs.length === 0) await fetchRecords();
-            const headers = ['PO Number', 'Date', 'Company', 'Supplier', 'Amount (RM)', 'Status', 'Approved By'];
-            const csvRows = [headers.join(',')];
-            currentPOs.forEach(po => {
-                const row = [po.po_number, po.po_date, `"${po.company_name}"`, `"${po.supplier_name}"`, po.total_amount.toFixed(2), po.status, po.approved_by || 'N/A'];
-                csvRows.push(row.join(','));
-            });
-            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `ITAKE_PO_Export_${new Date().toISOString().split('T')[0]}.csv`; a.click();
+        // Logic Functions
+        function addItemRow() {
+            const id = Date.now();
+            const div = document.createElement('div');
+            div.className = "grid grid-cols-12 gap-2 items-center bg-slate-50 p-3 rounded-2xl border";
+            div.id = `item-${id}`;
+            div.innerHTML = `
+                <div class="col-span-6"><input type="text" placeholder="Description" class="w-full bg-transparent font-bold text-xs outline-none" id="desc-${id}" required></div>
+                <div class="col-span-2"><input type="number" placeholder="Qty" class="w-full bg-white p-2 rounded-lg font-bold text-xs text-center border" id="qty-${id}" oninput="updateItemTotal(${id})" required></div>
+                <div class="col-span-3"><input type="number" step="0.01" placeholder="Price" class="w-full bg-white p-2 rounded-lg font-bold text-xs text-right border" id="price-${id}" oninput="updateItemTotal(${id})" required></div>
+                <div class="col-span-1 text-center"><button type="button" onclick="deleteItem(${id})" class="text-red-400"><i data-lucide="x" class="w-4 h-4"></i></button></div>
+            `;
+            document.getElementById('items-list').appendChild(div);
+            lucide.createIcons();
+        }
+
+        function deleteItem(id) {
+            const el = document.getElementById(`item-${id}`);
+            if(el) el.remove();
+            calculateTotal();
+        }
+
+        function updateItemTotal(id) { calculateTotal(); }
+
+        function calculateTotal() {
+            let total = 0;
+            const items = document.getElementById('items-list').children;
+            for(let item of items) {
+                const id = item.id.split('-')[1];
+                const q = parseFloat(document.getElementById(`qty-${id}`).value) || 0;
+                const p = parseFloat(document.getElementById(`price-${id}`).value) || 0;
+                total += q * p;
+            }
+            document.getElementById('grand-total-display').innerText = `RM ${formatRM(total)}`;
+            return total;
+        }
+
+        function getItemsFromDOM() {
+            const items = [];
+            const rows = document.getElementById('items-list').children;
+            for(let row of rows) {
+                const id = row.id.split('-')[1];
+                items.push({
+                    desc: document.getElementById(`desc-${id}`).value,
+                    qty: parseFloat(document.getElementById(`qty-${id}`).value),
+                    price: parseFloat(document.getElementById(`price-${id}`).value)
+                });
+            }
+            return items;
         }
 
         async function setAutoPONumber() {
@@ -175,21 +210,97 @@
             document.getElementById('po-date').value = now.toISOString().split('T')[0];
         }
 
+        // --- SUBMIT PO ---
+        document.getElementById('po-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const total = calculateTotal();
+            const items = getItemsFromDOM();
+            
+            const poData = {
+                po_number: document.getElementById('po-no').value,
+                po_date: document.getElementById('po-date').value,
+                company_key: document.getElementById('issuing-company').value,
+                company_name: CO_DATA[document.getElementById('issuing-company').value].name,
+                supplier_name: document.getElementById('supplier-name').value,
+                supplier_address: document.getElementById('supplier-address').value,
+                items: items, 
+                total_amount: total,
+                status: 'Pending'
+            };
+
+            const { error } = await supabaseClient.from('po_logs').insert(poData);
+
+            if (!error) {
+                // Send Email to Approver
+                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, {
+                    system_name: "ITAKE PO SYSTEM",
+                    header_bg: "#059669", // Emerald
+                    title: "New PO Request",
+                    html_body: 
+                        createRow("PO Number", poData.po_number) +
+                        createRow("Company", poData.company_name) +
+                        createRow("Supplier", poData.supplier_name) +
+                        createRow("Total Amount", "RM " + formatRM(poData.total_amount)),
+                    remark_text: "Please review via Admin Portal."
+                });
+
+                alert("PO Created & Email Sent");
+                e.target.reset();
+                document.getElementById('items-list').innerHTML = '';
+                addItemRow();
+                setAutoPONumber();
+            } else {
+                alert("Error saving PO");
+            }
+        };
+
+        // --- APPROVE/REJECT PO ---
+        async function updatePOStatus(id, newStatus) {
+            const approver = document.getElementById('approver-'+id).value;
+            const poData = currentPOs.find(p => p.id === id);
+            const { error } = await supabaseClient.from('po_logs').update({ status: newStatus, approved_by: approver }).eq('id', id);
+
+            if (!error && poData) {
+                const color = newStatus === 'Approved' ? '#10b981' : '#dc2626'; 
+                
+                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, {
+                    system_name: "ITAKE PO SYSTEM",
+                    header_bg: color,
+                    title: `PO ${newStatus}`,
+                    html_body: 
+                        createRow("PO Number", poData.po_number) +
+                        createRow("Status", newStatus.toUpperCase()) +
+                        createRow("Action By", approver) +
+                        createRow("Amount", "RM " + formatRM(poData.total_amount)),
+                    remark_text: newStatus === 'Approved' ? "Supplier can now be notified." : "PO has been rejected."
+                });
+
+                alert(`PO ${newStatus}`);
+                fetchRecords();
+            } else {
+                alert("Error updating database");
+            }
+        }
+
+        // UI Functions
         function switchTab(tab) {
             const priv = ['review', 'admin'];
-            if(priv.includes(tab) && !isAuthorized) { targetTab = tab; document.querySelectorAll('main > div').forEach(d => d.classList.add('hidden')); document.getElementById('auth-lock-screen').classList.remove('hidden'); }
+            if(priv.includes(tab) && !isAuthorized) { document.querySelectorAll('main > div').forEach(d => d.classList.add('hidden')); document.getElementById('auth-lock-screen').classList.remove('hidden'); }
             else { document.getElementById('auth-lock-screen').classList.add('hidden'); document.querySelectorAll('main > div').forEach(d => d.classList.toggle('hidden', d.id !== 'tab-' + tab)); if(tab === 'review' || tab === 'history' || tab === 'admin') fetchRecords(); }
             document.querySelectorAll('nav button').forEach(b => b.className = `px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all ${b.id === 'nav-'+tab ? 'tab-active' : 'text-slate-400'}`);
             lucide.createIcons();
         }
+
+        function checkMasterAuth() { if (document.getElementById('master-pin-input').value === masterPin) { isAuthorized = true; switchTab('review'); } else { alert("Unauthorized"); } }
+        function logoutGM() { isAuthorized = false; switchTab('create'); }
+        async function updateMasterPin() { const newPin = document.getElementById('new-master-pin').value; if (newPin.length === 4) { await supabaseClient.from('settings').update({ value: newPin }).eq('key', 'pin'); alert("PIN Updated"); logoutGM(); } else { alert("4 Digits Required"); } }
 
         async function fetchRecords() {
             const { data } = await supabaseClient.from('po_logs').select('*').order('created_at', { ascending: false });
             currentPOs = data || [];
             
             const pending = currentPOs.filter(p => p.status === 'Pending');
-            const reviewList = document.getElementById('review-list');
-            if (reviewList) reviewList.innerHTML = pending.map(po => `
+            document.getElementById('review-list').innerHTML = pending.map(po => `
                 <div class="bg-white p-6 rounded-[2.5rem] border shadow-sm space-y-4">
                     <div class="flex justify-between items-start">
                         <div><p class="text-[8px] font-black text-emerald-600 uppercase italic">${po.company_name}</p><h3 class="font-black text-sm uppercase">${po.po_number}</h3><p class="text-[10px] font-bold text-slate-400 uppercase">${po.supplier_name}</p></div>
@@ -205,8 +316,7 @@
                 </div>
             `).join('') || '<div class="text-center p-10 text-slate-300 italic text-xs">Queue Clear</div>';
 
-            const historyList = document.getElementById('history-list');
-            if (historyList) historyList.innerHTML = currentPOs.map(po => `
+            document.getElementById('history-list').innerHTML = currentPOs.map(po => `
                 <div class="bg-white p-5 rounded-[2rem] border shadow-sm flex justify-between items-center group">
                     <div><h3 class="font-black text-slate-800 text-sm tracking-tight">${po.po_number}</h3><p class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">${po.supplier_name}</p></div>
                     <div class="flex items-center gap-2">
@@ -217,33 +327,6 @@
                 </div>
             `).join('');
             lucide.createIcons();
-        }
-
-        // --- UPDATED: Sends "header_bg" to control email color ---
-        async function updatePOStatus(id, newStatus) {
-            const approver = document.getElementById('approver-'+id).value;
-            const poData = currentPOs.find(p => p.id === id);
-            const { error } = await supabaseClient.from('po_logs').update({ status: newStatus, approved_by: approver }).eq('id', id);
-
-            if (!error && poData) {
-                // Color Logic: Green for Approved, Red for Rejected
-                const colorCode = newStatus === 'Approved' ? '#10b981' : '#dc2626';
-
-                const emailParams = {
-                    po_number: poData.po_number,
-                    company: poData.company_name,
-                    amount: formatRM(poData.total_amount),
-                    approver: approver,
-                    status: newStatus,
-                    header_bg: colorCode // Sends color to Template
-                };
-                
-                emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_STATUS_TEMPLATE_ID, emailParams);
-                alert(`PO ${newStatus} Successfully`);
-                fetchRecords();
-            } else {
-                alert("Error updating database");
-            }
         }
 
         async function generatePDF(id) {
@@ -272,4 +355,35 @@
             const poY = 45 + addrHeight;
             doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
             doc.setFontSize(10).text(`PO Number: ${data.po_number}`, 130, poY);
-            doc.text(`Date: ${data.po_date}`,
+            doc.text(`Date: ${data.po_date}`, 130, poY + 5);
+
+            doc.autoTable({
+                startY: poY + 20,
+                head: [['Description', 'Qty', 'Unit Price (RM)', 'Total (RM)']],
+                body: data.items.map(i => [i.desc, i.qty, formatRM(i.price), formatRM(i.qty * i.price)]),
+                theme: 'grid',
+                headStyles: { fillColor: [16, 185, 129] }
+            });
+            
+            doc.setFontSize(10).setFont("helvetica", "bold");
+            doc.text(`Grand Total: RM ${formatRM(data.total_amount)}`, 140, doc.lastAutoTable.finalY + 10);
+            doc.save(`${data.po_number}.pdf`);
+        }
+        
+        async function deletePO(id) { if(confirm("Delete Record?")) { await supabaseClient.from('po_logs').delete().eq('id', id); fetchRecords(); } }
+        async function exportToCSV() {
+            if (currentPOs.length === 0) await fetchRecords();
+            const headers = ['PO Number', 'Date', 'Company', 'Supplier', 'Amount (RM)', 'Status', 'Approved By'];
+            const csvRows = [headers.join(',')];
+            currentPOs.forEach(po => {
+                const row = [po.po_number, po.po_date, `"${po.company_name}"`, `"${po.supplier_name}"`, po.total_amount.toFixed(2), po.status, po.approved_by || 'N/A'];
+                csvRows.push(row.join(','));
+            });
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const a = document.createElement('a'); a.href = window.URL.createObjectURL(blob); a.download = `ITAKE_PO_Report.csv`; a.click();
+        }
+
+        init();
+    </script>
+</body>
+</html>
