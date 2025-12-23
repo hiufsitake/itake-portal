@@ -11,7 +11,13 @@
     <title>ITAKE | Portal</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            -webkit-tap-highlight-color: transparent; 
+            opacity: 0; /* Hide body initially to prevent glitch */
+            transition: opacity 0.3s ease-in-out;
+        }
+        body.loaded { opacity: 1; } /* Show body once ready */
         
         .input-box { 
             border: 2px solid #f1f5f9; 
@@ -48,25 +54,21 @@
             <p class="text-[11px] font-black uppercase tracking-[0.5em] text-slate-400">Operations Portal</p>
         </div>
 
-        <div id="auth-view" class="space-y-6">
+        <div id="auth-view" class="hidden space-y-6">
             <div class="space-y-2">
                 <h2 id="auth-title" class="text-xl font-black text-slate-800">Welcome</h2>
                 <p id="auth-subtitle" class="text-xs font-bold text-slate-400">Please login to access the system.</p>
             </div>
-
             <div class="space-y-4">
                 <input type="email" id="email" placeholder="Email Address" class="input-box" required>
                 <input type="password" id="password" placeholder="Password" class="input-box" required>
             </div>
-
             <div class="flex justify-center items-center px-1">
                 <button onclick="toggleAuthMode()" id="toggle-auth-btn" class="text-[10px] font-bold text-slate-400 hover:text-emerald-600 uppercase tracking-widest transition-colors">Create Account</button>
             </div>
-
             <button onclick="handleAuth()" id="submit-btn" class="w-full bg-slate-900 text-white font-black p-5 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all">
                 Login
             </button>
-            
             <p id="error-msg" class="text-red-500 text-xs font-bold hidden bg-red-50 p-3 rounded-xl"></p>
             <p id="success-msg" class="text-emerald-600 text-xs font-bold hidden bg-emerald-50 p-3 rounded-xl"></p>
         </div>
@@ -82,7 +84,6 @@
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Procurement & SST</p>
                     </div>
                 </a>
-
                 <a href="cashclaim/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6">
                     <div class="bg-blue-500 text-white p-4 rounded-2xl shadow-lg shadow-blue-200">
                         <i data-lucide="wallet" class="w-6 h-6"></i>
@@ -92,7 +93,6 @@
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expenses & Claims</p>
                     </div>
                 </a>
-
                 <a href="leave/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6">
                     <div class="bg-slate-900 text-white p-4 rounded-2xl shadow-lg shadow-slate-200">
                         <i data-lucide="calendar" class="w-6 h-6"></i>
@@ -103,7 +103,6 @@
                     </div>
                 </a>
             </div>
-
             <button onclick="handleLogout()" class="text-[10px] font-bold text-red-300 hover:text-red-500 uppercase tracking-widest transition-colors flex items-center justify-center gap-2 mx-auto pt-4">
                 <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
             </button>
@@ -121,7 +120,6 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
         
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
         let isLoginMode = true;
 
         // Auto Sign-out when tab or browser is closed
@@ -137,20 +135,27 @@
             }
         });
 
-        // Forced logout on every access to the hub
+        // Forced logout logic handled seamlessly
         async function initPortal() {
-            await supabaseClient.auth.signOut();
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) {
+                await supabaseClient.auth.signOut();
+            }
             showAuth();
+            // Show body only after signOut check is done to avoid glitch
+            document.body.classList.add('loaded');
         }
 
         function showDashboard() {
             hideAll();
             document.getElementById('dashboard-view').classList.remove('hidden');
+            document.body.classList.add('loaded'); // Ensure shown
         }
 
         function showAuth() {
             hideAll();
             document.getElementById('auth-view').classList.remove('hidden');
+            document.body.classList.add('loaded'); // Ensure shown
         }
 
         function hideAll() {
@@ -224,6 +229,7 @@
             window.location.reload(); 
         }
 
+        // Initialize
         lucide.createIcons();
         initPortal(); 
     </script>
