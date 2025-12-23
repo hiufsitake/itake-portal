@@ -22,6 +22,7 @@
         .tab-active { background: #10b981; color: white; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
         .status-pending { background: #fef3c7; color: #92400e; }
         .status-approved { background: #dcfce7; color: #166534; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
         .sst-hidden { display: none !important; }
     </style>
 </head>
@@ -138,7 +139,10 @@
         // --- EMAILJS CONFIGURATION ---
         const EMAILJS_PUBLIC_KEY = "mAu312S8UzSdtFZuk";  
         const EMAILJS_SERVICE_ID = "service_0r59w66";  
-        const EMAILJS_TEMPLATE_ID = "template_ykwi7br"; 
+        const EMAILJS_NEW_REQ_TEMPLATE_ID = "template_ykwi7br"; 
+        
+        // --- UPDATED: Your New Status Template ID ---
+        const EMAILJS_STATUS_TEMPLATE_ID = "template_bzgidhw"; 
 
         let currentPOs = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
         const formatRM = (num) => num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -195,9 +199,12 @@
                         <div><p class="text-[8px] font-black text-emerald-600 uppercase italic">${po.company_name}</p><h3 class="font-black text-sm uppercase">${po.po_number}</h3><p class="text-[10px] font-bold text-slate-400 uppercase">${po.supplier_name}</p></div>
                         <div class="text-right"><p class="text-[8px] font-black text-slate-300 uppercase italic">Amount</p><p class="font-black text-slate-900">RM ${formatRM(po.total_amount)}</p></div>
                     </div>
-                    <div class="flex gap-2">
-                        <select id="approver-${po.id}" class="bg-slate-50 border-none rounded-xl px-4 py-2 text-[10px] font-bold outline-none"><option value="HFS">Approve as HFS</option><option value="TFH">Approve as TFH</option></select>
-                        <button onclick="approvePO('${po.id}')" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Confirm Approval</button>
+                    <div class="flex flex-col gap-2">
+                        <select id="approver-${po.id}" class="bg-slate-50 border-none rounded-xl px-4 py-2 text-[10px] font-bold outline-none"><option value="HFS">Action as HFS</option><option value="TFH">Action as TFH</option></select>
+                        <div class="flex gap-2">
+                            <button onclick="updatePOStatus('${po.id}', 'Approved')" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-emerald-700">Approve</button>
+                            <button onclick="updatePOStatus('${po.id}', 'Rejected')" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg hover:bg-red-600">Reject</button>
+                        </div>
                     </div>
                 </div>
             `).join('') || '<div class="text-center p-10 text-slate-300 italic text-xs">Queue Clear</div>';
@@ -214,6 +221,33 @@
                 </div>
             `).join('');
             lucide.createIcons();
+        }
+
+        // --- NEW SHARED FUNCTION FOR APPROVE & REJECT ---
+        async function updatePOStatus(id, newStatus) {
+            const approver = document.getElementById('approver-'+id).value;
+            const poData = currentPOs.find(p => p.id === id);
+
+            // 1. Update Database
+            const { error } = await supabaseClient.from('po_logs').update({ status: newStatus, approved_by: approver }).eq('id', id);
+
+            if (!error && poData) {
+                // 2. Send Confirmation Email
+                const emailParams = {
+                    po_number: poData.po_number,
+                    company: poData.company_name,
+                    amount: formatRM(poData.total_amount),
+                    approver: approver,
+                    status: newStatus 
+                };
+                
+                emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_STATUS_TEMPLATE_ID, emailParams);
+
+                alert(`PO ${newStatus} Successfully`);
+                fetchRecords();
+            } else {
+                alert("Error updating database");
+            }
         }
 
         async function generatePDF(id) {
@@ -272,21 +306,16 @@
             if(newPin.length === 4) { await supabaseClient.from('settings').update({ value: newPin }).eq('key', 'pin'); alert("PIN Updated"); logoutGM(); init(); }
         }
 
-        async function approvePO(id) { 
-            const approver = document.getElementById('approver-'+id).value;
-            await supabaseClient.from('po_logs').update({ status: 'Approved', approved_by: approver }).eq('id', id);
-            fetchRecords(); 
-        }
         async function deletePO(id) { if(confirm("Delete record?")) { await supabaseClient.from('po_logs').delete().eq('id', id); fetchRecords(); } }
         function addItemRow() { const container = document.getElementById('items-list'); const div = document.createElement('div'); div.className = 'item-row grid grid-cols-12 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 items-center'; div.innerHTML = `<input type="text" placeholder="Description" class="col-span-5 bg-transparent font-bold text-[11px] outline-none" required><input type="number" placeholder="Qty" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center" required><input type="text" placeholder="Unit" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center"><input type="number" step="0.01" placeholder="Price" class="col-span-2 bg-transparent font-bold text-[11px] outline-none text-center" required><input type="number" step="0.1" placeholder="%" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center sst-col ${CO_DATA[document.getElementById('issuing-company').value].sst ? '' : 'sst-hidden'}"><button type="button" onclick="this.parentElement.remove()" class="col-span-2 text-red-300 hover:text-red-600 flex justify-center"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`; container.appendChild(div); lucide.createIcons(); }
         function toggleSSTFields() { const isSST = CO_DATA[document.getElementById('issuing-company').value].sst; document.querySelectorAll('.sst-col').forEach(el => el.classList.toggle('sst-hidden', !isSST)); }
 
-        // --- SUBMIT FUNCTION WITH EMAILJS ---
+        // --- SUBMIT FUNCTION ---
         document.getElementById('po-form').onsubmit = async function(e) {
             e.preventDefault();
             const btn = document.getElementById('submit-btn');
             const originalText = btn.innerHTML;
-            btn.innerHTML = 'Submitting & Sending Email...';
+            btn.innerHTML = 'Submitting...';
             btn.disabled = true;
 
             const items = []; let sub = 0, tax = 0;
@@ -296,19 +325,18 @@
             });
             const payload = { po_number: document.getElementById('po-no').value, po_date: document.getElementById('po-date').value, company_key: document.getElementById('issuing-company').value, company_name: CO_DATA[document.getElementById('issuing-company').value].name, supplier_name: document.getElementById('supplier-name').value, supplier_address: document.getElementById('supplier-address').value, items: items, total_amount: sub + tax, status: 'Pending' };
             
-            // 1. Save to Supabase
             const { error } = await supabaseClient.from('po_logs').insert(payload);
 
             if (!error) {
-                // 2. Send Email Notification
                 const emailParams = {
                     po_number: payload.po_number,
                     company: payload.company_name,
                     supplier: payload.supplier_name,
-                    amount: formatRM(payload.total_amount)
+                    amount: formatRM(payload.total_amount),
+                    portal_link: window.location.origin + "/index.html" 
                 };
 
-                emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, emailParams)
+                emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_NEW_REQ_TEMPLATE_ID, emailParams)
                     .then(function() {
                         alert("PO Submitted & Email Notification Sent!");
                         resetForm();
