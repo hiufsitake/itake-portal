@@ -141,16 +141,14 @@
         const EMAILJS_SERVICE_ID = "service_0r59w66";  
         const EMAILJS_NEW_REQ_TEMPLATE_ID = "template_ykwi7br"; 
         
-        // --- UPDATED: Your New Status Template ID ---
+        // Use your specific template ID for status updates
         const EMAILJS_STATUS_TEMPLATE_ID = "template_bzgidhw"; 
 
         let currentPOs = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
         const formatRM = (num) => num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         async function init() {
-            // Initialize EmailJS
             emailjs.init(EMAILJS_PUBLIC_KEY);
-
             const { data } = await supabaseClient.from('settings').select('value').eq('key', 'pin').single();
             if(data) masterPin = data.value;
             addItemRow();
@@ -223,7 +221,7 @@
             lucide.createIcons();
         }
 
-        // --- NEW SHARED FUNCTION FOR APPROVE & REJECT ---
+        // --- UPDATED STATUS FUNCTION WITH COLOR LOGIC ---
         async function updatePOStatus(id, newStatus) {
             const approver = document.getElementById('approver-'+id).value;
             const poData = currentPOs.find(p => p.id === id);
@@ -232,13 +230,17 @@
             const { error } = await supabaseClient.from('po_logs').update({ status: newStatus, approved_by: approver }).eq('id', id);
 
             if (!error && poData) {
-                // 2. Send Confirmation Email
+                // Determine color: Green for Approved, Red for Rejected
+                const colorCode = newStatus === 'Approved' ? '#10b981' : '#dc2626';
+
+                // 2. Send Confirmation Email with Color
                 const emailParams = {
                     po_number: poData.po_number,
                     company: poData.company_name,
                     amount: formatRM(poData.total_amount),
                     approver: approver,
-                    status: newStatus 
+                    status: newStatus,
+                    header_bg: colorCode // Pass the color to the template
                 };
                 
                 emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_STATUS_TEMPLATE_ID, emailParams);
