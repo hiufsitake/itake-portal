@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="ilogocc.PNG" type="image/PNG"> 
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    
     <title>ITAKE | Cash Claim</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
@@ -19,6 +20,7 @@
         .tab-active { background: #10b981; color: white; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
         .status-pending { background: #fef3c7; color: #92400e; }
         .status-approved { background: #dcfce7; color: #166534; }
+        .status-rejected { background: #fee2e2; color: #991b1b; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen pb-24 text-slate-900 font-medium">
@@ -113,6 +115,21 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // --- SECURITY GUARD ---
+        async function checkAccess() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                alert("Unauthorized access. Please login via Portal Hub.");
+                window.location.href = "../index.html"; 
+            }
+        }
+        checkAccess();
+
+        // --- EMAILJS CONFIG ---
+        const EMAIL_SERVICE = "service_0r59w66";
+        const EMAIL_TEMPLATE = "template_0ml31p9";
+        const EMAIL_KEY = "mAu312S8UzSdtFZuk";
+
         const HQ_ADDR = "Unit 906-3-04, Soon Hup Tower (2nd Floor), Jalan Maju, 98000 Miri, Sarawak, Malaysia.";
         const CO_DATA = {
             'SOLUTIONS': { name: 'ITAKE SOLUTIONS SDN. BHD.', reg: '201701003049 (1217199-M)', email: 'itakessb@gmail.com' },
@@ -122,8 +139,10 @@
 
         let currentClaims = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
         const formatRM = (num) => num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const createRow = (label, value) => `<tr><td style="padding: 8px 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase;">${label}</td><td style="padding: 8px 0; color: #0f172a; font-size: 14px; font-weight: bold; text-align: right;">${value}</td></tr><tr><td colspan="2" style="border-bottom: 1px solid #f1f5f9;"></td></tr>`;
 
         async function init() {
+            emailjs.init(EMAIL_KEY);
             const { data } = await supabaseClient.from('settings').select('value').eq('key', 'pin').single();
             if(data) masterPin = data.value;
             addItemRow(); setAutoCCNumber(); lucide.createIcons();
@@ -171,9 +190,13 @@
                     <div class="flex justify-between items-start">
                         <div><h3 class="font-black text-sm uppercase">${cc.claim_number}</h3><p class="text-[10px] font-bold text-slate-400 uppercase tracking-tight">${cc.claimant_name} | RM ${formatRM(cc.total_amount)}</p></div>
                     </div>
-                    <div class="flex gap-2">
-                        <select id="approver-${cc.id}" class="bg-slate-50 border-none rounded-xl px-4 py-2 text-[10px] font-bold"><option value="HFS">Approve as HFS</option><option value="TFH">Approve as TFH</option></select>
-                        <button onclick="approveClaim('${cc.id}')" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Confirm Approval</button>
+                    <div class="space-y-3">
+                        <textarea id="reason-${cc.id}" placeholder="Reason / Feedback (Optional)" class="w-full bg-slate-50 border-none rounded-xl p-3 text-[10px] font-bold outline-none" rows="2"></textarea>
+                        <select id="approver-${cc.id}" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-[10px] font-bold outline-none"><option value="HFS">Action as HFS</option><option value="TFH">Action as TFH</option></select>
+                        <div class="flex gap-2">
+                            <button onclick="handleStatusChange('${cc.id}', 'Approved')" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approve</button>
+                            <button onclick="handleStatusChange('${cc.id}', 'Rejected')" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Reject</button>
+                        </div>
                     </div>
                 </div>
             `).join('') || '<div class="text-center p-10 text-slate-300 italic text-xs">Queue Clear</div>';
@@ -191,10 +214,25 @@
             lucide.createIcons();
         }
 
-        async function approveClaim(id) { 
+        async function handleStatusChange(id, newStatus) {
             const approver = document.getElementById('approver-'+id).value;
-            await supabaseClient.from('cash_claims').update({ status: 'Approved', approved_by: approver }).eq('id', id);
-            fetchRecords(); 
+            const reasonInput = document.getElementById('reason-'+id).value.trim();
+            await supabaseClient.from('cash_claims').update({ status: newStatus, approved_by: approver }).eq('id', id);
+            
+            const ccData = currentClaims.find(c => c.id === id);
+            if(ccData) {
+                const color = newStatus === 'Approved' ? "#10b981" : "#ef4444";
+                const defaultReason = newStatus === 'Approved' ? "Your claim has been processed." : "This claim has been declined.";
+                
+                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, {
+                    system_name: "ITAKE CLAIM SYSTEM",
+                    header_bg: color,
+                    title: `Claim ${newStatus}`,
+                    html_body: createRow("Claim No", ccData.claim_number) + createRow("Status", newStatus.toUpperCase()) + createRow("Action By", approver) + createRow("Amount", "RM " + formatRM(ccData.total_amount)),
+                    remark_text: reasonInput || defaultReason
+                });
+            }
+            fetchRecords();
         }
 
         async function generatePDF(id) {
@@ -203,20 +241,14 @@
             const doc = new jsPDF();
             const info = CO_DATA[data.company_key];
 
-            // --- HEADER ---
             doc.setFont("helvetica", "bold").setFontSize(14).text(info.name, 14, 25);
             doc.setFontSize(8).setFont("helvetica", "normal").text(doc.splitTextToSize(HQ_ADDR, 100), 14, 30);
-            
-            // --- ADDED ATTN LINE ---
             doc.setFont("helvetica", "bold").text("Attn: Ir. Tian Foon Howe", 14, 42);
-
-            // --- REFERENCE INFO ---
             doc.setFont("helvetica", "bold").text(`CASH CLAIM: ${data.claim_number}`, 130, 25);
             doc.text(`Date: ${new Date(data.submission_date).toLocaleDateString('en-GB')}`, 130, 30);
 
-            // --- INFO TABLE ---
             doc.autoTable({
-                startY: 50, // Pushed down slightly to make room for Attn line
+                startY: 50,
                 body: [
                     ['Claimant', data.claimant_name, 'Payable to', data.payable_name],
                     ['NRIC', data.claimant_nric, 'Project', data.project],
@@ -227,26 +259,17 @@
                 columnStyles: { 0: { fontStyle: 'bold', width: 25 }, 2: { fontStyle: 'bold', width: 25 } }
             });
 
-            // --- ITEMS TABLE ---
             doc.autoTable({
                 startY: doc.lastAutoTable.finalY + 5,
                 head: [['No.', 'Description', 'Qty', 'Unit Price (RM)', 'Total RM']],
                 body: data.items.map((i, idx) => [idx+1, i.desc, i.qty, formatRM(i.price), formatRM(i.qty * i.price)]),
-                theme: 'grid', 
-                headStyles: { fillColor: [15, 23, 42] }, 
-                styles: { fontSize: 8 }, 
+                theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, 
                 columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
             });
 
             doc.setFont("helvetica", "bold").text(`TOTAL AMOUNT: RM ${formatRM(data.total_amount)}`, 196, doc.lastAutoTable.finalY + 10, { align: 'right' });
-
-            // --- FOOTER WITH TIMESTAMP ---
-            const printDate = new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-            
-            doc.setFontSize(9).setFont("helvetica", "italic");
-            doc.text(`This Cash Claim is digitally approved by ${data.approved_by} on ${printDate}.`, 14, doc.lastAutoTable.finalY + 25);
-            doc.text(`No signature is required.`, 14, doc.lastAutoTable.finalY + 30);
-            
+            const printDate = new Date().toLocaleString('en-GB');
+            doc.setFontSize(9).setFont("helvetica", "italic").text(`Digitally approved by ${data.approved_by} on ${printDate}.`, 14, doc.lastAutoTable.finalY + 25);
             doc.save(`${data.claim_number}.pdf`);
         }
 
@@ -259,7 +282,7 @@
             lucide.createIcons();
         }
 
-        async function deleteClaim(id) { if(confirm("Delete record?")) { await supabaseClient.from('cash_claims').delete().eq('id', id); fetchRecords(); } }
+        async function deleteClaim(id) { if(confirm("Delete?")) { await supabaseClient.from('cash_claims').delete().eq('id', id); fetchRecords(); } }
 
         document.getElementById('claim-form').onsubmit = async function(e) {
             e.preventDefault();
@@ -281,13 +304,21 @@
                 project: document.getElementById('project-name').value, 
                 items: items, total_amount: sub, status: 'Pending' 
             };
+            
             const { error } = await supabaseClient.from('cash_claims').insert(payload);
-            if(!error) { alert("Claim Submitted"); location.reload(); } else { alert("Error: " + error.message); }
+            if(!error) {
+                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, {
+                    system_name: "ITAKE CLAIM SYSTEM",
+                    header_bg: "#059669",
+                    title: "New Claim Request",
+                    html_body: createRow("Claimant", payload.claimant_name) + createRow("Project", payload.project) + createRow("Amount", "RM " + formatRM(payload.total_amount)),
+                    remark_text: "Please review via Admin Portal."
+                });
+                alert("Claim Submitted"); location.reload(); 
+            } else { alert("Error: " + error.message); }
         };
 
         init();
     </script>
 </body>
-
 </html>
-
