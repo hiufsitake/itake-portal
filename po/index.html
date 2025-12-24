@@ -234,17 +234,23 @@
                     const pdfWidth = 40; const pdfHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth;
                     const wrappedAddr = doc.splitTextToSize(HQ_ADDR, 120);
                     const addrHeight = wrappedAddr.length * 4;
-                    const logoY = (28 + addrHeight) - pdfHeight;
+                    
+                    // Fixed Baseline: 28 (start of wrapped addr) + addrHeight (height of wrapped addr)
+                    const baselineY = 28 + addrHeight;
+                    const logoY = baselineY - pdfHeight; // Aligns logo bottom with the last row of contact info
+                    
                     doc.addImage(img, 'JPEG', 14, logoY, pdfWidth, pdfHeight); 
                     doc.setFont("helvetica", "bold").setFontSize(16).text(info.name, 58, 18);
                     doc.setFontSize(8).setFont("helvetica", "normal").text(`Company Reg. No.: ${info.reg}`, 58, 23);
                     doc.text(wrappedAddr, 58, 28);
-                    doc.text(`Phone: ${HQ_TEL} | Email: ${info.email} | Web: www.itakeosb.com`, 58, 28 + addrHeight);
-                    doc.setDrawColor(16, 185, 129).setLineWidth(0.5).line(14, 32 + addrHeight, 196, 32 + addrHeight);
-                    const poY = 45 + addrHeight; doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
+                    doc.text(`Phone: ${HQ_TEL} | Email: ${info.email} | Web: www.itakeosb.com`, 58, baselineY);
+                    doc.setDrawColor(16, 185, 129).setLineWidth(0.5).line(14, baselineY + 4, 196, baselineY + 4);
+                    
+                    const poY = baselineY + 17; doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
                     doc.setFontSize(10).text(`PO Number: ${data.po_number}`, 130, poY); doc.text(`Date: ${data.po_date}`, 130, poY + 6);
                     doc.text("Supplier:", 14, poY + 16); doc.setFont("helvetica", "normal").text(data.supplier_name, 35, poY + 16);
                     doc.setFont("helvetica", "bold").text("Address:", 14, poY + 22); doc.setFont("helvetica", "normal").text(doc.splitTextToSize(data.supplier_address, 80), 35, poY + 22);
+                    
                     const head = info.sst ? [['No.', 'Item Description', 'Qty', 'Unit', 'Price (RM)', 'SST%', 'SST RM', 'Total (RM)']] : [['No.', 'Description', 'Qty', 'Unit', 'Price (RM)', 'Total (RM)']];
                     const body = data.items.map((i, idx) => { const amt = i.qty * i.price; const sstVal = amt * (i.sst/100); return info.sst ? [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), i.sst+"%", formatRM(sstVal), formatRM(amt+sstVal)] : [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), formatRM(amt)]; });
                     doc.autoTable({ startY: poY + 38, head, body, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, columnStyles: { 4: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } } });
