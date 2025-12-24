@@ -231,19 +231,22 @@
             try { 
                 const img = new Image(); img.src = LOGO_FILENAME; await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
                 if(img.complete && img.naturalWidth !== 0) { 
-                    const pdfWidth = 40; const pdfHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth;
+                    // Logo 10% larger (from 40 to 44)
+                    const pdfWidth = 44; 
+                    const pdfHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth;
+                    
                     const wrappedAddr = doc.splitTextToSize(HQ_ADDR, 120);
                     const addrHeight = wrappedAddr.length * 4;
                     
-                    // Fixed Baseline: 28 (start of wrapped addr) + addrHeight (height of wrapped addr)
+                    // The Phone row (last row of contact info) is at: 28 + addrHeight
                     const baselineY = 28 + addrHeight;
-                    const logoY = baselineY - pdfHeight; // Aligns logo bottom with the last row of contact info
+                    const logoY = baselineY - pdfHeight; 
                     
                     doc.addImage(img, 'JPEG', 14, logoY, pdfWidth, pdfHeight); 
-                    doc.setFont("helvetica", "bold").setFontSize(16).text(info.name, 58, 18);
-                    doc.setFontSize(8).setFont("helvetica", "normal").text(`Company Reg. No.: ${info.reg}`, 58, 23);
-                    doc.text(wrappedAddr, 58, 28);
-                    doc.text(`Phone: ${HQ_TEL} | Email: ${info.email} | Web: www.itakeosb.com`, 58, baselineY);
+                    doc.setFont("helvetica", "bold").setFontSize(16).text(info.name, 62, 18);
+                    doc.setFontSize(8).setFont("helvetica", "normal").text(`Company Reg. No.: ${info.reg}`, 62, 23);
+                    doc.text(wrappedAddr, 62, 28);
+                    doc.text(`Phone: ${HQ_TEL} | Email: ${info.email} | Web: www.itakeosb.com`, 62, baselineY);
                     doc.setDrawColor(16, 185, 129).setLineWidth(0.5).line(14, baselineY + 4, 196, baselineY + 4);
                     
                     const poY = baselineY + 17; doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
@@ -256,11 +259,13 @@
                     doc.autoTable({ startY: poY + 38, head, body, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, columnStyles: { 4: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } } });
                     const finalY = doc.lastAutoTable.finalY;
                     doc.setFont("helvetica", "bold").setFontSize(11).text(`TOTAL (RM): ${formatRM(data.total_amount)}`, 196, finalY + 10, { align: 'right' });
+                    
                     if (data.status === 'Pending') {
                         doc.setTextColor(220, 38, 38); doc.setFontSize(14); doc.setFont("helvetica", "bold");
                         doc.text("DRAFT - FOR REVIEW ONLY", 196, finalY + 20, { align: 'right' });
                         doc.setTextColor(0, 0, 0); 
                     }
+                    
                     const printApprover = data.status === 'Pending' ? "DRAFT (NOT APPROVED)" : data.approved_by;
                     const now = new Date(); const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0'); const dateStr = now.toLocaleDateString('en-GB');
                     doc.setFontSize(9).setFont("helvetica", "italic"); 
