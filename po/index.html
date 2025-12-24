@@ -7,22 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <script>
-        const AUTH_URL = 'https://bszndksgqdvrblvtsmmr.supabase.co';
-        const AUTH_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
-        const authClient = supabase.createClient(AUTH_URL, AUTH_KEY);
-
-        async function checkSession() {
-            const { data: { session } } = await authClient.auth.getSession();
-            if (!session) {
-                // User is not logged in, redirect to Portal Login
-                window.location.href = "../index.html"; 
-            }
-        }
-        checkSession();
-    </script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     
@@ -295,4 +279,5 @@
     </script>
 </body>
 </html>
+
 
