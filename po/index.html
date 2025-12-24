@@ -82,8 +82,11 @@
                     <div id="items-list" class="space-y-3"></div>
                 </section>
 
-                <button type="submit" class="w-full bg-slate-900 text-white font-black p-6 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs italic flex items-center justify-center gap-3">
+                <button type="submit" id="submit-btn" class="w-full bg-slate-900 text-white font-black p-6 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs italic flex items-center justify-center gap-3">
                     <i data-lucide="send" class="w-5 h-5"></i> Submit for Review
+                </button>
+                <button type="button" onclick="cancelEdit()" id="cancel-edit-btn" class="hidden w-full border-2 border-slate-200 text-slate-400 font-black p-4 rounded-[2rem] uppercase tracking-widest text-[10px] italic mt-2">
+                    Cancel Editing
                 </button>
             </form>
         </div>
@@ -98,24 +101,16 @@
 
         <div id="tab-admin" class="hidden space-y-4">
             <section class="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-8 text-center">
-                <div class="space-y-2">
-                    <i data-lucide="database" class="w-12 h-12 mx-auto text-emerald-500"></i>
-                    <h2 class="font-black text-slate-800 uppercase text-sm italic">Data Management</h2>
-                    <p class="text-[10px] text-slate-400 font-bold uppercase">Export all PO records to CSV for accounting</p>
-                </div>
-                
+                <i data-lucide="database" class="w-12 h-12 mx-auto text-emerald-500"></i>
                 <button onclick="exportToCSV()" class="w-full bg-slate-900 text-white p-5 rounded-3xl font-black uppercase text-xs tracking-[0.2em] shadow-lg flex items-center justify-center gap-3">
                     <i data-lucide="download" class="w-5 h-5"></i> Export Database (CSV)
                 </button>
-
                 <hr class="border-slate-100">
-
                 <div class="space-y-4">
                     <h2 class="font-black text-slate-400 uppercase text-[9px] tracking-widest">Master PIN Security</h2>
                     <input type="password" id="new-master-pin" placeholder="New 4-Digit PIN" class="input-box text-center text-2xl">
-                    <button onclick="updateMasterPin()" class="w-full bg-emerald-600 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">Update System PIN</button>
+                    <button onclick="updateMasterPin()" class="w-full bg-emerald-600 text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest">Update PIN</button>
                 </div>
-
                 <button onclick="logoutGM()" class="w-full border-2 border-red-50 text-red-400 p-3 rounded-xl font-black uppercase text-[8px] tracking-widest">Lock Admin Session</button>
             </section>
         </div>
@@ -140,6 +135,8 @@
         };
 
         let currentPOs = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
+        let editingId = null; 
+
         const formatRM = (num) => num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const createRow = (label, value) => `<tr><td style="padding: 8px 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase;">${label}</td><td style="padding: 8px 0; color: #0f172a; font-size: 14px; font-weight: bold; text-align: right;">${value}</td></tr><tr><td colspan="2" style="border-bottom: 1px solid #f1f5f9;"></td></tr>`;
 
@@ -147,28 +144,11 @@
             emailjs.init(EMAIL_KEY);
             const { data } = await supabaseClient.from('settings').select('value').eq('key', 'pin').single();
             if(data) masterPin = data.value;
-            addItemRow();
-            setAutoPONumber();
-            lucide.createIcons();
-        }
-
-        async function exportToCSV() {
-            if (currentPOs.length === 0) await fetchRecords();
-            const headers = ['PO Number', 'Date', 'Company', 'Supplier', 'Amount (RM)', 'Status', 'Approved By'];
-            const csvRows = [headers.join(',')];
-            currentPOs.forEach(po => {
-                const row = [po.po_number, po.po_date, `"${po.company_name}"`, `"${po.supplier_name}"`, po.total_amount.toFixed(2), po.status, po.approved_by || 'N/A'];
-                csvRows.push(row.join(','));
-            });
-            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.setAttribute('href', url);
-            a.setAttribute('download', `ITAKE_PO_Export_${new Date().toISOString().split('T')[0]}.csv`);
-            a.click();
+            addItemRow(); setAutoPONumber(); lucide.createIcons();
         }
 
         async function setAutoPONumber() {
+            if (editingId) return; 
             const now = new Date();
             const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
             const { count } = await supabaseClient.from('po_logs').select('*', { count: 'exact', head: true }).gte('created_at', `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
@@ -179,7 +159,7 @@
         function switchTab(tab) {
             const priv = ['review', 'admin'];
             if(priv.includes(tab) && !isAuthorized) { targetTab = tab; document.querySelectorAll('main > div').forEach(d => d.classList.add('hidden')); document.getElementById('auth-lock-screen').classList.remove('hidden'); }
-            else { document.getElementById('auth-lock-screen').classList.add('hidden'); document.querySelectorAll('main > div').forEach(d => d.classList.toggle('hidden', d.id !== 'tab-' + tab)); if(tab === 'review' || tab === 'history' || tab === 'admin') fetchRecords(); }
+            else { document.getElementById('auth-lock-screen').classList.add('hidden'); document.querySelectorAll('main > div').forEach(d => d.classList.toggle('hidden', d.id !== 'tab-' + tab)); if(tab === 'review' || tab === 'history') fetchRecords(); }
             document.querySelectorAll('nav button').forEach(b => b.className = `px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all ${b.id === 'nav-'+tab ? 'tab-active' : 'text-slate-400'}`);
             lucide.createIcons();
         }
@@ -187,33 +167,30 @@
         async function fetchRecords() {
             const { data } = await supabaseClient.from('po_logs').select('*').order('created_at', { ascending: false });
             currentPOs = data || [];
-            
-            const pending = currentPOs.filter(p => p.status === 'Pending');
-            const reviewList = document.getElementById('review-list');
-            if (reviewList) reviewList.innerHTML = pending.map(po => `
+            document.getElementById('review-list').innerHTML = currentPOs.filter(p => p.status === 'Pending').map(po => `
                 <div class="bg-white p-6 rounded-[2.5rem] border shadow-sm space-y-4">
                     <div class="flex justify-between items-start">
                         <div><p class="text-[8px] font-black text-emerald-600 uppercase italic">${po.company_name}</p><h3 class="font-black text-sm uppercase">${po.po_number}</h3><p class="text-[10px] font-bold text-slate-400 uppercase">${po.supplier_name}</p></div>
-                        <div class="text-right"><p class="text-[8px] font-black text-slate-300 uppercase italic">Amount</p><p class="font-black text-slate-900">RM ${formatRM(po.total_amount)}</p></div>
+                        <div class="text-right">
+                             <p class="text-[8px] font-black text-slate-300 uppercase italic">Amount</p><p class="font-black text-slate-900">RM ${formatRM(po.total_amount)}</p>
+                             <button onclick="generatePDF('${po.id}')" class="mt-2 bg-blue-50 text-blue-600 px-3 py-1 rounded-lg font-black text-[8px] uppercase flex items-center gap-1 mx-auto"><i data-lucide="eye" class="w-3 h-3"></i> View PO</button>
+                        </div>
                     </div>
                     <div class="space-y-3">
                         <textarea id="reason-${po.id}" placeholder="Reason / Feedback (Optional)" class="w-full bg-slate-50 border-none rounded-xl p-3 text-[10px] font-bold outline-none" rows="2"></textarea>
                         <select id="approver-${po.id}" class="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-[10px] font-bold outline-none"><option value="HFS">Action as HFS</option><option value="TFH">Action as TFH</option></select>
-                        <div class="flex gap-2">
-                            <button onclick="handleStatusChange('${po.id}', 'Approved')" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approve</button>
-                            <button onclick="handleStatusChange('${po.id}', 'Rejected')" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Reject</button>
-                        </div>
+                        <div class="flex gap-2"><button onclick="handleStatusChange('${po.id}', 'Approved')" class="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Approve</button><button onclick="handleStatusChange('${po.id}', 'Rejected')" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Reject</button></div>
                     </div>
                 </div>
             `).join('') || '<div class="text-center p-10 text-slate-300 italic text-xs">Queue Clear</div>';
 
-            const historyList = document.getElementById('history-list');
-            if (historyList) historyList.innerHTML = currentPOs.map(po => `
+            document.getElementById('history-list').innerHTML = currentPOs.map(po => `
                 <div class="bg-white p-5 rounded-[2rem] border shadow-sm flex justify-between items-center group">
                     <div><h3 class="font-black text-slate-800 text-sm tracking-tight">${po.po_number}</h3><p class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">${po.supplier_name}</p></div>
                     <div class="flex items-center gap-2">
                         <div class="status-${po.status.toLowerCase()} px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">${po.status}</div>
                         ${po.status === 'Approved' ? `<button onclick="generatePDF('${po.id}')" class="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all"><i data-lucide="printer" class="w-4 h-4"></i></button>` : ''}
+                        ${po.status === 'Rejected' ? `<button onclick="loadPOForEdit('${po.id}')" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><i data-lucide="edit-3" class="w-4 h-4"></i></button>` : ''}
                         <button onclick="deletePO('${po.id}')" class="p-3 bg-red-50 text-red-400 rounded-xl hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                     </div>
                 </div>
@@ -221,46 +198,34 @@
             lucide.createIcons();
         }
 
+        function loadPOForEdit(id) {
+            const po = currentPOs.find(p => p.id === id);
+            if (!po) return; editingId = id; switchTab('create');
+            document.getElementById('issuing-company').value = po.company_key; document.getElementById('po-no').value = po.po_number; document.getElementById('po-date').value = po.po_date; document.getElementById('supplier-name').value = po.supplier_name; document.getElementById('supplier-address').value = po.supplier_address;
+            const container = document.getElementById('items-list'); container.innerHTML = '';
+            po.items.forEach(item => { addItemRow(); const rows = document.querySelectorAll('.item-row'); const lastRow = rows[rows.length - 1]; const inputs = lastRow.querySelectorAll('input'); inputs[0].value = item.desc; inputs[1].value = item.qty; inputs[2].value = item.unit; inputs[3].value = item.price; if(inputs[4]) inputs[4].value = item.sst; });
+            document.getElementById('submit-btn').innerHTML = `<i data-lucide="save" class="w-5 h-5"></i> Update & Resubmit`; document.getElementById('cancel-edit-btn').classList.remove('hidden'); toggleSSTFields(); lucide.createIcons(); window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelEdit() { editingId = null; document.getElementById('po-form').reset(); document.getElementById('items-list').innerHTML = ''; document.getElementById('submit-btn').innerHTML = `<i data-lucide="send" class="w-5 h-5"></i> Submit for Review`; document.getElementById('cancel-edit-btn').classList.add('hidden'); addItemRow(); setAutoPONumber(); lucide.createIcons(); }
+
         async function handleStatusChange(id, newStatus) {
-            const approver = document.getElementById('approver-'+id).value;
-            const reasonInput = document.getElementById('reason-'+id).value.trim();
+            const approver = document.getElementById('approver-'+id).value; const reasonInput = document.getElementById('reason-'+id).value.trim();
             await supabaseClient.from('po_logs').update({ status: newStatus, approved_by: approver }).eq('id', id);
-            
             const poData = currentPOs.find(p => p.id === id);
             if(poData) {
-                const color = newStatus === 'Approved' ? "#10b981" : "#ef4444";
-                const defaultReason = newStatus === 'Approved' ? "Supplier can now be notified." : "This request has been declined.";
-                
-                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, {
-                    system_name: "ITAKE PO SYSTEM",
-                    header_bg: color,
-                    title: `PO ${newStatus}`,
-                    html_body: 
-                        createRow("PO Number", poData.po_number) +
-                        createRow("Status", newStatus.toUpperCase()) +
-                        createRow("Action By", approver) +
-                        createRow("Amount", "RM " + formatRM(poData.total_amount)),
-                    remark_text: reasonInput || defaultReason
-                });
+                const color = newStatus === 'Approved' ? "#10b981" : "#ef4444"; const defaultReason = newStatus === 'Approved' ? "Supplier can now be notified." : "This request has been declined.";
+                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, { system_name: "ITAKE PO SYSTEM", header_bg: color, title: `PO ${newStatus}`, html_body: createRow("PO Number", poData.po_number) + createRow("Status", newStatus.toUpperCase()) + createRow("Action By", approver) + createRow("Amount", "RM " + formatRM(poData.total_amount)), remark_text: reasonInput || defaultReason });
             }
             fetchRecords();
         }
 
-        async function approvePO(id) { handleStatusChange(id, 'Approved'); }
-
         async function generatePDF(id) {
             const data = currentPOs.find(p => p.id === id);
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const info = CO_DATA[data.company_key];
+            const { jsPDF } = window.jspdf; const doc = new jsPDF(); const info = CO_DATA[data.company_key];
             try { 
-                const img = new Image(); img.src = LOGO_FILENAME;
-                await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
-                if(img.complete && img.naturalWidth !== 0) {
-                    const pdfWidth = 40;
-                    const pdfHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth;
-                    doc.addImage(img, 'JPEG', 14, 10, pdfWidth, pdfHeight); 
-                }
+                const img = new Image(); img.src = LOGO_FILENAME; await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
+                if(img.complete && img.naturalWidth !== 0) { const pdfWidth = 40; const pdfHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth; doc.addImage(img, 'JPEG', 14, 10, pdfWidth, pdfHeight); }
             } catch(e) {}
             doc.setFont("helvetica", "bold").setFontSize(16).text(info.name, 58, 18);
             doc.setFontSize(8).setFont("helvetica", "normal").text(`Company Reg. No.: ${info.reg}`, 58, 23);
@@ -268,55 +233,46 @@
             const addrHeight = wrappedAddr.length * 4;
             doc.text(`Phone: ${HQ_TEL} | Email: ${info.email} | Web: www.itakeosb.com`, 58, 28 + addrHeight);
             doc.setDrawColor(16, 185, 129).setLineWidth(0.5).line(14, 32 + addrHeight, 196, 32 + addrHeight);
-            const poY = 45 + addrHeight;
-            doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
-            doc.setFontSize(10).text(`PO Number: ${data.po_number}`, 130, poY);
-            doc.text(`Date: ${data.po_date}`, 130, poY + 6);
+            const poY = 45 + addrHeight; doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
+            doc.setFontSize(10).text(`PO Number: ${data.po_number}`, 130, poY); doc.text(`Date: ${data.po_date}`, 130, poY + 6);
             doc.text("Supplier:", 14, poY + 16); doc.setFont("helvetica", "normal").text(data.supplier_name, 35, poY + 16);
             doc.setFont("helvetica", "bold").text("Address:", 14, poY + 22); doc.setFont("helvetica", "normal").text(doc.splitTextToSize(data.supplier_address, 80), 35, poY + 22);
+            
             const head = info.sst ? [['No.', 'Item Description', 'Qty', 'Unit', 'Price (RM)', 'SST%', 'SST RM', 'Total (RM)']] : [['No.', 'Description', 'Qty', 'Unit', 'Price (RM)', 'Total (RM)']];
-            const body = data.items.map((i, idx) => {
-                const amt = i.qty * i.price; const sstVal = amt * (i.sst/100);
-                return info.sst ? [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), i.sst+"%", formatRM(sstVal), formatRM(amt+sstVal)] : [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), formatRM(amt)];
-            });
+            const body = data.items.map((i, idx) => { const amt = i.qty * i.price; const sstVal = amt * (i.sst/100); return info.sst ? [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), i.sst+"%", formatRM(sstVal), formatRM(amt+sstVal)] : [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), formatRM(amt)]; });
             doc.autoTable({ startY: poY + 38, head, body, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, columnStyles: { 4: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } } });
-            doc.setFont("helvetica", "bold").setFontSize(11).text(`TOTAL (RM): ${formatRM(data.total_amount)}`, 196, doc.lastAutoTable.finalY + 10, { align: 'right' });
-            const now = new Date();
-            const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
-            const dateStr = now.toLocaleDateString('en-GB');
-            doc.setFontSize(9).setFont("helvetica", "italic");
-            doc.text(`This PO is digitally approved by ${data.approved_by} on ${dateStr} @ ${timeStr}hours, no signature is required.`, 14, doc.lastAutoTable.finalY + 30);
+            
+            const finalY = doc.lastAutoTable.finalY;
+            doc.setFont("helvetica", "bold").setFontSize(11).text(`TOTAL (RM): ${formatRM(data.total_amount)}`, 196, finalY + 10, { align: 'right' });
+            
+            // RED WATERMARK LOGIC
+            if (data.status === 'Pending') {
+                doc.setTextColor(220, 38, 38); doc.setFontSize(14); doc.setFont("helvetica", "bold");
+                doc.text("DRAFT - FOR REVIEW ONLY", 196, finalY + 20, { align: 'right' });
+                doc.setTextColor(0, 0, 0); 
+            }
+
+            const printApprover = data.status === 'Pending' ? "DRAFT (NOT APPROVED)" : data.approved_by;
+            const now = new Date(); const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0'); const dateStr = now.toLocaleDateString('en-GB');
+            doc.setFontSize(9).setFont("helvetica", "italic"); 
+            doc.text(`This PO is digitally approved by ${printApprover} on ${dateStr} @ ${timeStr}hours, no signature is required.`, 14, finalY + 30);
             doc.save(`${data.po_number}.pdf`);
         }
 
         function checkMasterAuth() { if(document.getElementById('master-pin-input').value === masterPin) { isAuthorized = true; switchTab(targetTab); } else { alert("Unauthorized"); } }
         function logoutGM() { isAuthorized = false; switchTab('create'); }
-        async function updateMasterPin() {
-            const newPin = document.getElementById('new-master-pin').value;
-            if(newPin.length === 4) { await supabaseClient.from('settings').update({ value: newPin }).eq('key', 'pin'); alert("PIN Updated"); logoutGM(); init(); }
-        }
-
+        async function updateMasterPin() { const newPin = document.getElementById('new-master-pin').value; if(newPin.length === 4) { await supabaseClient.from('settings').update({ value: newPin }).eq('key', 'pin'); alert("PIN Updated"); logoutGM(); init(); } }
         async function deletePO(id) { if(confirm("Delete record?")) { await supabaseClient.from('po_logs').delete().eq('id', id); fetchRecords(); } }
         function addItemRow() { const container = document.getElementById('items-list'); const div = document.createElement('div'); div.className = 'item-row grid grid-cols-12 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 items-center'; div.innerHTML = `<input type="text" placeholder="Description" class="col-span-5 bg-transparent font-bold text-[11px] outline-none" required><input type="number" placeholder="Qty" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center" required><input type="text" placeholder="Unit" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center"><input type="number" step="0.01" placeholder="Price" class="col-span-2 bg-transparent font-bold text-[11px] outline-none text-center" required><input type="number" step="0.1" placeholder="%" class="col-span-1 bg-transparent font-bold text-[11px] outline-none text-center sst-col ${CO_DATA[document.getElementById('issuing-company').value].sst ? '' : 'sst-hidden'}"><button type="button" onclick="this.parentElement.remove()" class="col-span-2 text-red-300 hover:text-red-600 flex justify-center"><i data-lucide="trash-2" class="w-4 h-4"></i></button>`; container.appendChild(div); lucide.createIcons(); }
         function toggleSSTFields() { const isSST = CO_DATA[document.getElementById('issuing-company').value].sst; document.querySelectorAll('.sst-col').forEach(el => el.classList.toggle('sst-hidden', !isSST)); }
 
         document.getElementById('po-form').onsubmit = async function(e) {
-            e.preventDefault();
-            const items = []; let sub = 0, tax = 0;
-            document.querySelectorAll('.item-row').forEach(row => {
-                const f = row.querySelectorAll('input'); const qty = parseFloat(f[1].value), pr = parseFloat(f[3].value), amt = qty * pr, sstP = parseFloat(f[4].value || 0);
-                sub += amt; tax += (amt * sstP / 100); items.push({ desc: f[0].value, qty, unit: f[2].value, price: pr, sst: sstP });
-            });
+            e.preventDefault(); const items = []; let sub = 0, tax = 0;
+            document.querySelectorAll('.item-row').forEach(row => { const f = row.querySelectorAll('input'); const qty = parseFloat(f[1].value), pr = parseFloat(f[3].value), amt = qty * pr, sstP = parseFloat(f[4].value || 0); sub += amt; tax += (amt * sstP / 100); items.push({ desc: f[0].value, qty, unit: f[2].value, price: pr, sst: sstP }); });
             const payload = { po_number: document.getElementById('po-no').value, po_date: document.getElementById('po-date').value, company_key: document.getElementById('issuing-company').value, company_name: CO_DATA[document.getElementById('issuing-company').value].name, supplier_name: document.getElementById('supplier-name').value, supplier_address: document.getElementById('supplier-address').value, items: items, total_amount: sub + tax, status: 'Pending' };
-            await supabaseClient.from('po_logs').insert(payload);
-            emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, {
-                system_name: "ITAKE PO SYSTEM",
-                header_bg: "#059669",
-                title: "New PO Request",
-                html_body: createRow("PO Number", payload.po_number) + createRow("Company", payload.company_name) + createRow("Supplier", payload.supplier_name) + createRow("Total Amount", "RM " + formatRM(payload.total_amount)),
-                remark_text: "Please review via Admin Portal."
-            });
-            alert("PO Submitted"); document.getElementById('po-form').reset(); document.getElementById('items-list').innerHTML = ''; addItemRow(); setAutoPONumber();
+            if (editingId) { await supabaseClient.from('po_logs').update(payload).eq('id', editingId); alert("PO Updated & Resubmitted"); } else { await supabaseClient.from('po_logs').insert(payload); alert("PO Submitted"); }
+            emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, { system_name: "ITAKE PO SYSTEM", header_bg: "#059669", title: editingId ? "PO Resubmitted" : "New PO Request", html_body: createRow("PO Number", payload.po_number) + createRow("Company", payload.company_name) + createRow("Supplier", payload.supplier_name) + createRow("Total Amount", "RM " + formatRM(payload.total_amount)), remark_text: editingId ? `PO Number ${payload.po_number} corrected and resubmitted.` : "Please review via Admin Portal." });
+            cancelEdit(); 
         };
 
         init();
