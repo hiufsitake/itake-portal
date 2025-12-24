@@ -52,10 +52,17 @@
                     <div class="bg-emerald-500 text-white p-4 rounded-2xl"><i data-lucide="shopping-cart"></i></div>
                     <div><h2 class="font-black uppercase italic text-slate-800 text-lg">PO System</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Procurement & SST</p></div>
                 </a>
+
                 <a href="cashclaim/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
                     <div class="bg-blue-500 text-white p-4 rounded-2xl"><i data-lucide="wallet"></i></div>
-                    <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Cash Claim</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expenses & Claims</p></div>
+                    <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Cash Claim</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">General Expenses</p></div>
                 </a>
+
+                <a href="staffclaim/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
+                    <div class="bg-purple-600 text-white p-4 rounded-2xl"><i data-lucide="file-signature"></i></div>
+                    <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Staff Claim</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Staff Reimbursement</p></div>
+                </a>
+
                 <a href="leave/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
                     <div class="bg-slate-900 text-white p-4 rounded-2xl"><i data-lucide="calendar"></i></div>
                     <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Leave System</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Staff Attendance</p></div>
@@ -74,14 +81,11 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // LOGIC: Check if this tab has an active session
-        // sessionStorage is deleted automatically when the tab is closed
         async function initPortal() {
             const tabActive = sessionStorage.getItem('itake_tab_session');
             const { data: { session } } = await supabaseClient.auth.getSession();
 
             if (!tabActive && session) {
-                // If the tab is fresh but a session exists in localStorage, kill it
                 await supabaseClient.auth.signOut();
                 showAuth();
             } else if (session) {
