@@ -9,13 +9,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 
     <title>ITAKE | PO</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; opacity: 0; transition: opacity 0.3s ease-in-out; }
-        body.loaded { opacity: 1; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
         .input-box { border: 2px solid #f1f5f9; padding: 1rem; border-radius: 1.25rem; background: #f8fafc; font-weight: 700; width: 100%; outline: none; transition: all 0.2s; }
         .input-box:focus { border-color: #10b981; background: white; }
         .tab-active { background: #10b981; color: white; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3); }
@@ -60,6 +60,7 @@
                         <option value="ENERGY">ITAKE ENERGY SDN. BHD.</option>
                     </select>
                 </section>
+
                 <div class="grid md:grid-cols-2 gap-6">
                     <section class="bg-white p-6 rounded-[2.5rem] shadow-sm border space-y-4">
                         <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400">PO Details</h2>
@@ -72,6 +73,7 @@
                         <textarea id="supplier-address" placeholder="Supplier Address" class="input-box" rows="2" required></textarea>
                     </section>
                 </div>
+
                 <section class="bg-white p-6 rounded-[2.5rem] shadow-sm border space-y-4">
                     <div class="flex justify-between items-center mb-2">
                         <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400">Itemized List</h2>
@@ -79,6 +81,7 @@
                     </div>
                     <div id="items-list" class="space-y-3"></div>
                 </section>
+
                 <button type="submit" id="submit-btn" class="w-full bg-slate-900 text-white font-black p-6 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs italic flex items-center justify-center gap-3">
                     <i data-lucide="send" class="w-5 h-5"></i> Submit for Review
                 </button>
@@ -131,7 +134,8 @@
             'ENERGY': { name: 'ITAKE ENERGY SDN. BHD.', reg: '202501050305 (1651713-K)', email: 'itakeenergy@gmail.com', sst: false }
         };
 
-        let currentPOs = [], isAuthorized = false, masterPin = '1234', targetTab = 'create', editingId = null;
+        let currentPOs = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
+        let editingId = null; 
 
         const formatRM = (num) => num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const createRow = (label, value) => `<tr><td style="padding: 8px 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase;">${label}</td><td style="padding: 8px 0; color: #0f172a; font-size: 14px; font-weight: bold; text-align: right;">${value}</td></tr><tr><td colspan="2" style="border-bottom: 1px solid #f1f5f9;"></td></tr>`;
@@ -141,7 +145,6 @@
             const { data } = await supabaseClient.from('settings').select('value').eq('key', 'pin').single();
             if(data) masterPin = data.value;
             addItemRow(); setAutoPONumber(); lucide.createIcons();
-            document.body.classList.add('loaded');
         }
 
         async function setAutoPONumber() {
@@ -156,7 +159,7 @@
         function switchTab(tab) {
             const priv = ['review', 'admin'];
             if(priv.includes(tab) && !isAuthorized) { targetTab = tab; document.querySelectorAll('main > div').forEach(d => d.classList.add('hidden')); document.getElementById('auth-lock-screen').classList.remove('hidden'); }
-            else { document.getElementById('auth-lock-screen').classList.add('hidden'); document.querySelectorAll('main > div').forEach(d => d.classList.toggle('hidden', d.id !== 'tab-' + tab)); if(tab === 'review' || tab === 'history' || tab === 'admin') fetchRecords(); }
+            else { document.getElementById('auth-lock-screen').classList.add('hidden'); document.querySelectorAll('main > div').forEach(d => d.classList.toggle('hidden', d.id !== 'tab-' + tab)); if(tab === 'review' || tab === 'history') fetchRecords(); }
             document.querySelectorAll('nav button').forEach(b => b.className = `px-3 py-2 rounded-lg text-[9px] font-bold uppercase transition-all ${b.id === 'nav-'+tab ? 'tab-active' : 'text-slate-400'}`);
             lucide.createIcons();
         }
@@ -222,46 +225,38 @@
             const { jsPDF } = window.jspdf; const doc = new jsPDF(); const info = CO_DATA[data.company_key];
             try { 
                 const img = new Image(); img.src = LOGO_FILENAME; await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
-                if(img.complete && img.naturalWidth !== 0) { 
-                    const pdfWidth = 48.4; 
-                    const pdfHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth;
-                    const wrappedAddr = doc.splitTextToSize(HQ_ADDR, 120);
-                    const addrHeight = wrappedAddr.length * 4;
-                    const baselineY = 28 + addrHeight;
-                    
-                    // Fine-tuned logo alignment to Phone row baseline
-                    const logoY = baselineY - (pdfHeight * 0.95); 
-                    
-                    doc.addImage(img, 'JPEG', 14, logoY, pdfWidth, pdfHeight); 
-                    doc.setFont("helvetica", "bold").setFontSize(16).text(info.name, 66, 18);
-                    doc.setFontSize(8).setFont("helvetica", "normal").text(`Company Reg. No.: ${info.reg}`, 66, 23);
-                    doc.text(wrappedAddr, 66, 28);
-                    doc.text(`Phone: ${HQ_TEL} | Email: ${info.email} | Web: www.itakeosb.com`, 66, baselineY);
-                    doc.setDrawColor(16, 185, 129).setLineWidth(0.5).line(14, baselineY + 4, 196, baselineY + 4);
-                    
-                    const poY = baselineY + 17; doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
-                    doc.setFontSize(10).text(`PO Number: ${data.po_number}`, 130, poY); doc.text(`Date: ${data.po_date}`, 130, poY + 6);
-                    doc.text("Supplier:", 14, poY + 16); doc.setFont("helvetica", "normal").text(data.supplier_name, 35, poY + 16);
-                    doc.setFont("helvetica", "bold").text("Address:", 14, poY + 22); doc.setFont("helvetica", "normal").text(doc.splitTextToSize(data.supplier_address, 80), 35, poY + 22);
-                    
-                    const head = info.sst ? [['No.', 'Item Description', 'Qty', 'Unit', 'Price (RM)', 'SST%', 'SST RM', 'Total (RM)']] : [['No.', 'Description', 'Qty', 'Unit', 'Price (RM)', 'Total (RM)']];
-                    const body = data.items.map((i, idx) => { const amt = i.qty * i.price; const sstVal = amt * (i.sst/100); return info.sst ? [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), i.sst+"%", formatRM(sstVal), formatRM(amt+sstVal)] : [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), formatRM(amt)]; });
-                    doc.autoTable({ startY: poY + 38, head, body, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, columnStyles: { 4: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } } });
-                    const finalY = doc.lastAutoTable.finalY;
-                    doc.setFont("helvetica", "bold").setFontSize(11).text(`TOTAL (RM): ${formatRM(data.total_amount)}`, 196, finalY + 10, { align: 'right' });
-                    
-                    if (data.status === 'Pending') {
-                        doc.setTextColor(220, 38, 38); doc.setFontSize(14); doc.setFont("helvetica", "bold");
-                        doc.text("DRAFT - FOR REVIEW ONLY", 196, finalY + 20, { align: 'right' });
-                        doc.setTextColor(0, 0, 0); 
-                    }
-                    const printApprover = data.status === 'Pending' ? "DRAFT (NOT APPROVED)" : data.approved_by;
-                    const now = new Date(); const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0'); const dateStr = now.toLocaleDateString('en-GB');
-                    doc.setFontSize(9).setFont("helvetica", "italic"); 
-                    doc.text(`This PO is digitally approved by ${printApprover} on ${dateStr} @ ${timeStr}hours, no signature is required.`, 14, finalY + 30);
-                    doc.save(`${data.po_number}.pdf`);
-                }
+                if(img.complete && img.naturalWidth !== 0) { const pdfWidth = 40; const pdfHeight = (img.naturalHeight * pdfWidth) / img.naturalWidth; doc.addImage(img, 'JPEG', 14, 10, pdfWidth, pdfHeight); }
             } catch(e) {}
+            doc.setFont("helvetica", "bold").setFontSize(16).text(info.name, 58, 18);
+            doc.setFontSize(8).setFont("helvetica", "normal").text(`Company Reg. No.: ${info.reg}`, 58, 23);
+            const wrappedAddr = doc.splitTextToSize(HQ_ADDR, 120); doc.text(wrappedAddr, 58, 28);
+            const addrHeight = wrappedAddr.length * 4;
+            doc.text(`Phone: ${HQ_TEL} | Email: ${info.email} | Web: www.itakeosb.com`, 58, 28 + addrHeight);
+            doc.setDrawColor(16, 185, 129).setLineWidth(0.5).line(14, 32 + addrHeight, 196, 32 + addrHeight);
+            const poY = 45 + addrHeight; doc.setFontSize(18).setFont("helvetica", "bold").text("PURCHASE ORDER", 14, poY);
+            doc.setFontSize(10).text(`PO Number: ${data.po_number}`, 130, poY); doc.text(`Date: ${data.po_date}`, 130, poY + 6);
+            doc.text("Supplier:", 14, poY + 16); doc.setFont("helvetica", "normal").text(data.supplier_name, 35, poY + 16);
+            doc.setFont("helvetica", "bold").text("Address:", 14, poY + 22); doc.setFont("helvetica", "normal").text(doc.splitTextToSize(data.supplier_address, 80), 35, poY + 22);
+            
+            const head = info.sst ? [['No.', 'Item Description', 'Qty', 'Unit', 'Price (RM)', 'SST%', 'SST RM', 'Total (RM)']] : [['No.', 'Description', 'Qty', 'Unit', 'Price (RM)', 'Total (RM)']];
+            const body = data.items.map((i, idx) => { const amt = i.qty * i.price; const sstVal = amt * (i.sst/100); return info.sst ? [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), i.sst+"%", formatRM(sstVal), formatRM(amt+sstVal)] : [idx+1, i.desc, i.qty, i.unit, formatRM(i.price), formatRM(amt)]; });
+            doc.autoTable({ startY: poY + 38, head, body, theme: 'grid', headStyles: { fillColor: [15, 23, 42] }, styles: { fontSize: 8 }, columnStyles: { 4: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } } });
+            
+            const finalY = doc.lastAutoTable.finalY;
+            doc.setFont("helvetica", "bold").setFontSize(11).text(`TOTAL (RM): ${formatRM(data.total_amount)}`, 196, finalY + 10, { align: 'right' });
+            
+            // RED WATERMARK LOGIC
+            if (data.status === 'Pending') {
+                doc.setTextColor(220, 38, 38); doc.setFontSize(14); doc.setFont("helvetica", "bold");
+                doc.text("DRAFT - FOR REVIEW ONLY", 196, finalY + 20, { align: 'right' });
+                doc.setTextColor(0, 0, 0); 
+            }
+
+            const printApprover = data.status === 'Pending' ? "DRAFT (NOT APPROVED)" : data.approved_by;
+            const now = new Date(); const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0'); const dateStr = now.toLocaleDateString('en-GB');
+            doc.setFontSize(9).setFont("helvetica", "italic"); 
+            doc.text(`This PO is digitally approved by ${printApprover} on ${dateStr} @ ${timeStr}hours, no signature is required.`, 14, finalY + 30);
+            doc.save(`${data.po_number}.pdf`);
         }
 
         function checkMasterAuth() { if(document.getElementById('master-pin-input').value === masterPin) { isAuthorized = true; switchTab(targetTab); } else { alert("Unauthorized"); } }
