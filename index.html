@@ -42,12 +42,18 @@
                 <input type="email" id="email" placeholder="Email Address" class="input-box" required>
                 <input type="password" id="password" placeholder="Password" class="input-box" required>
             </div>
-            <button onclick="handleAuth()" id="submit-btn" class="w-full bg-slate-900 text-white font-black p-5 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all">Login</button>
-            <p id="error-msg" class="text-red-500 text-xs font-bold hidden bg-red-50 p-3 rounded-xl"></p>
             
-            <button onclick="toggleAuthMode()" id="toggle-btn" class="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-emerald-500 transition-all">
-                Don't have an account? Create one
-            </button>
+            <div class="flex flex-col gap-3">
+                <button onclick="handleAuth()" id="submit-btn" class="w-full bg-slate-900 text-white font-black p-5 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all">
+                    Login
+                </button>
+                
+                <button onclick="toggleAuthMode()" id="toggle-btn" class="w-full bg-white border-2 border-slate-200 text-slate-900 font-black p-5 rounded-[2rem] uppercase tracking-widest text-[10px] hover:border-emerald-500 hover:text-emerald-500 transition-all shadow-sm">
+                    Create New Account
+                </button>
+            </div>
+
+            <p id="error-msg" class="text-red-500 text-xs font-bold hidden bg-red-50 p-3 rounded-xl"></p>
         </div>
 
         <div id="dashboard-view" class="hidden space-y-6">
@@ -58,14 +64,12 @@
                 </a>
                 <a href="cashclaim/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
                     <div class="bg-blue-500 text-white p-4 rounded-2xl"><i data-lucide="wallet"></i></div>
-                    <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Cash Claim</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">General Expenses</p></div>
+                    <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Cash Claim</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Expenses & Claims</p></div>
                 </a>
-                
                 <a href="staffclaim/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
                     <div class="bg-purple-600 text-white p-4 rounded-2xl"><i data-lucide="file-signature"></i></div>
                     <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Staff Claim</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Staff Reimbursement</p></div>
                 </a>
-
                 <a href="leave/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
                     <div class="bg-slate-900 text-white p-4 rounded-2xl"><i data-lucide="calendar"></i></div>
                     <div><h2 class="font-black uppercase italic text-slate-800 text-lg">Leave System</h2><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Staff Attendance</p></div>
@@ -135,12 +139,12 @@
                 title.innerText = "Welcome";
                 subtitle.innerText = "Please login to access the system.";
                 btn.innerText = "Login";
-                toggle.innerText = "Don't have an account? Create one";
+                toggle.innerText = "Create New Account";
             } else {
                 title.innerText = "Create Account";
                 subtitle.innerText = "Enter your details to register.";
                 btn.innerText = "Sign Up";
-                toggle.innerText = "Already have an account? Login";
+                toggle.innerText = "Back to Login";
             }
         }
 
@@ -160,7 +164,6 @@
             errorMsg.classList.add('hidden');
 
             if (isLoginMode) {
-                // Login Logic
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) {
                     errorMsg.innerText = error.message;
@@ -168,7 +171,6 @@
                     btn.innerText = "Login";
                 }
             } else {
-                // Sign Up Logic
                 const { error } = await supabaseClient.auth.signUp({ email, password });
                 if (error) {
                     errorMsg.innerText = error.message;
