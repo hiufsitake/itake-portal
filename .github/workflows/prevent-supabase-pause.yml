@@ -11,7 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping Supabase Database
+        env:
+          # Your specific project key provided above
+          SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXFoZGZudHljY3lmZXZjb2NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUwMzksImV4cCI6MjA4MTY4MTAzOX0.DhcUsqkPsEMun_G-1EUX233eUWSoOkAVl0wFQ2R91Oo
         run: |
-          curl -f -X GET 'https://Izaqhdfntyccyfevcocd.supabase.co/rest/v1/' \
-          -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
-          -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}"
+          # Sends a request to your project (lzaqhdfntyccyfevcocd)
+          curl -f -X GET 'https://lzaqhdfntyccyfevcocd.supabase.co/rest/v1/' \
+          -H "apikey: $SUPABASE_KEY" \
+          -H "Authorization: Bearer $SUPABASE_KEY"
