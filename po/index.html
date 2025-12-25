@@ -161,6 +161,26 @@
         let currentPOs = [], isAuthorized = false, masterPin = '1234', targetTab = 'create';
         let editingId = null; 
 
+        // AUTO LOGOUT CONFIGURATION (UPDATED to 15 Minutes)
+        let inactivityTimeout;
+        const TIMEOUT_DURATION = 900000; // 15 Minutes in milliseconds (15 * 60 * 1000)
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimeout);
+            inactivityTimeout = setTimeout(async () => {
+                await supabaseClient.auth.signOut();
+                alert("Session expired due to inactivity.");
+                window.location.href = "../index.html";
+            }, TIMEOUT_DURATION);
+        }
+
+        // Add event listeners for user activity
+        ['mousemove', 'keypress', 'click', 'scroll', 'touchstart'].forEach(evt => {
+            document.addEventListener(evt, resetInactivityTimer);
+        });
+        resetInactivityTimer(); // Start timer on load
+
+
         const formatRM = (num) => num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const createRow = (label, value) => `<tr><td style="padding: 8px 0; color: #64748b; font-size: 12px; font-weight: bold; text-transform: uppercase;">${label}</td><td style="padding: 8px 0; color: #0f172a; font-size: 14px; font-weight: bold; text-align: right;">${value}</td></tr><tr><td colspan="2" style="border-bottom: 1px solid #f1f5f9;"></td></tr>`;
 
