@@ -189,6 +189,13 @@
             window.location.reload(); 
         }
 
+        // --- NEW FEATURE: TRIGGER LOGIN ON ENTER KEY ---
+        document.getElementById('password').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                handleAuth();
+            }
+        });
+
         lucide.createIcons();
         initPortal(); 
     </script>
