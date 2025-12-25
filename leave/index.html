@@ -11,15 +11,23 @@
     <title>ITAKE | Leave System</title>
 
     <script>
+        // 1. Hide the entire page immediately so unauthorized users see nothing (White Screen)
+        document.documentElement.style.display = 'none';
+
         const GUARD_URL = 'https://bszndksgqdvrblvtsmmr.supabase.co';
         const GUARD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJzem5ka3NncWR2cmJsdnRzbW1yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUyNDksImV4cCI6MjA4MTY4MTI0OX0.mu6oEib2o8KKtWgnk8zHCx-nmbHHNkfnc_qVE-Ua5yg';
         const guardClient = supabase.createClient(GUARD_URL, GUARD_KEY);
 
         async function checkSession() {
+            // 2. Ask Supabase if a user session exists
             const { data: { session } } = await guardClient.auth.getSession();
+            
             if (!session) {
-                // If not logged in, redirect back to the main Portal
+                // 3. If NO session, kick them back to the portal immediately
                 window.location.href = "../index.html"; 
+            } else {
+                // 4. If session EXISTS, reveal the page
+                document.documentElement.style.display = '';
             }
         }
         checkSession();
@@ -200,6 +208,25 @@
 
         let db = { staff: [], logs: [], pin: '1234' };
         let isAuthorized = false, durationMode = 'full', halfDayType = 'Morning';
+
+        // AUTO LOGOUT CONFIGURATION (15 Minutes)
+        let inactivityTimeout;
+        const TIMEOUT_DURATION = 900000; // 15 Minutes in milliseconds
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimeout);
+            inactivityTimeout = setTimeout(async () => {
+                await supabaseClient.auth.signOut();
+                alert("Session expired due to inactivity.");
+                window.location.href = "../index.html";
+            }, TIMEOUT_DURATION);
+        }
+
+        // Add event listeners for user activity
+        ['mousemove', 'keypress', 'click', 'scroll', 'touchstart'].forEach(evt => {
+            document.addEventListener(evt, resetInactivityTimer);
+        });
+        resetInactivityTimer(); // Start timer on load
 
         // Initialize
         (function() {
@@ -404,4 +431,3 @@
     </script>
 </body>
 </html>
-
