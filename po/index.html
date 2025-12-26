@@ -72,6 +72,7 @@
             <h3 class="font-black text-lg uppercase italic text-slate-800">Management Authorization</h3>
             <input type="password" id="master-pin-input" class="border-2 border-slate-100 p-4 rounded-2xl w-32 text-center text-2xl font-black bg-slate-50 focus:border-emerald-500 outline-none" placeholder="****">
             <button onclick="checkMasterAuth()" class="block mx-auto bg-emerald-600 text-white px-10 py-4 rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg">Unlock Access</button>
+            <p class="text-[10px] text-slate-400">Press ENTER to unlock</p>
         </div>
 
         <div id="tab-create">
@@ -90,6 +91,8 @@
                         <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400">PO Details</h2>
                         <input type="text" id="po-no" class="input-box bg-slate-100 text-slate-500" readonly required>
                         <input type="date" id="po-date" class="input-box" readonly>
+                        <input type="text" id="creator-name" placeholder="Created By (Name)" class="input-box" required>
+                        <input type="email" id="creator-email" placeholder="Creator Email (for updates)" class="input-box" required>
                     </section>
                     <section class="bg-white p-6 rounded-[2.5rem] shadow-sm border space-y-4">
                         <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400">Supplier Details</h2>
@@ -189,6 +192,16 @@
             const { data } = await supabaseClient.from('settings').select('value').eq('key', 'pin').single();
             if(data) masterPin = data.value;
             addItemRow(); setAutoPONumber(); lucide.createIcons();
+            
+            // --- ENTER KEY FOR PIN ---
+            const pinInput = document.getElementById('master-pin-input');
+            if(pinInput) {
+                pinInput.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        checkMasterAuth();
+                    }
+                });
+            }
         }
 
         async function setAutoPONumber() {
@@ -246,6 +259,11 @@
             const po = currentPOs.find(p => p.id === id);
             if (!po) return; editingId = id; switchTab('create');
             document.getElementById('issuing-company').value = po.company_key; document.getElementById('po-no').value = po.po_number; document.getElementById('po-date').value = po.po_date; document.getElementById('supplier-name').value = po.supplier_name; document.getElementById('supplier-address').value = po.supplier_address;
+            
+            // --- LOAD CREATOR DETAILS (FROM NEW DB COLUMNS) ---
+            document.getElementById('creator-name').value = po.created_by || '';
+            document.getElementById('creator-email').value = po.creator_email || '';
+
             const container = document.getElementById('items-list'); container.innerHTML = '';
             po.items.forEach(item => { addItemRow(); const rows = document.querySelectorAll('.item-row'); const lastRow = rows[rows.length - 1]; const inputs = lastRow.querySelectorAll('input'); inputs[0].value = item.desc; inputs[1].value = item.qty; inputs[2].value = item.unit; inputs[3].value = item.price; if(inputs[4]) inputs[4].value = item.sst; });
             document.getElementById('submit-btn').innerHTML = `<i data-lucide="save" class="w-5 h-5"></i> Update & Resubmit`; document.getElementById('cancel-edit-btn').classList.remove('hidden'); toggleSSTFields(); lucide.createIcons(); window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -259,7 +277,21 @@
             const poData = currentPOs.find(p => p.id === id);
             if(poData) {
                 const color = newStatus === 'Approved' ? "#10b981" : "#ef4444"; const defaultReason = newStatus === 'Approved' ? "Supplier can now be notified." : "This request has been declined.";
-                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, { system_name: "ITAKE PO SYSTEM", header_bg: color, title: `PO ${newStatus}`, html_body: createRow("PO Number", poData.po_number) + createRow("Status", newStatus.toUpperCase()) + createRow("Action By", approver) + createRow("Amount", "RM " + formatRM(poData.total_amount)), remark_text: reasonInput || defaultReason });
+                
+                // --- FOOTER CONSTRUCTION (Using New DB Columns) ---
+                const createdDate = new Date(poData.created_at).toLocaleDateString('en-GB') + ' ' + new Date(poData.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const footerInfo = `This PO is created by ${poData.created_by || 'Unknown'} on ${createdDate}.`;
+
+                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, { 
+                    system_name: "ITAKE PO SYSTEM", 
+                    header_bg: color, 
+                    title: `PO ${newStatus}`, 
+                    // --- TARGET CREATOR EMAIL (FROM DB) ---
+                    to_email: poData.creator_email, 
+                    to_name: poData.created_by,
+                    html_body: createRow("PO Number", poData.po_number) + createRow("Status", newStatus.toUpperCase()) + createRow("Action By", approver) + createRow("Amount", "RM " + formatRM(poData.total_amount)), 
+                    remark_text: (reasonInput || defaultReason) + "\n\n" + footerInfo
+                });
             }
             fetchRecords();
         }
@@ -289,17 +321,28 @@
             const finalY = doc.lastAutoTable.finalY;
             doc.setFont("helvetica", "bold").setFontSize(11).text(`TOTAL (RM): ${formatRM(data.total_amount)}`, 196, finalY + 10, { align: 'right' });
             
-            // RED WATERMARK LOGIC
             if (data.status === 'Pending') {
                 doc.setTextColor(220, 38, 38); doc.setFontSize(14); doc.setFont("helvetica", "bold");
                 doc.text("DRAFT - FOR REVIEW ONLY", 196, finalY + 20, { align: 'right' });
                 doc.setTextColor(0, 0, 0); 
             }
 
-            const printApprover = data.status === 'Pending' ? "DRAFT (NOT APPROVED)" : data.approved_by;
-            const now = new Date(); const timeStr = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0'); const dateStr = now.toLocaleDateString('en-GB');
-            doc.setFontSize(9).setFont("helvetica", "italic"); 
-            doc.text(`This PO is digitally approved by ${printApprover} on ${dateStr} @ ${timeStr}hours, no signature is required.`, 14, finalY + 30);
+            // --- UPDATED FOOTER LOGIC ---
+            // 1. Created By Line (Always Visible)
+            const creator = data.created_by || 'System';
+            const cDate = new Date(data.created_at);
+            const cDateStr = cDate.toLocaleDateString('en-GB') + ' @ ' + String(cDate.getHours()).padStart(2,'0') + String(cDate.getMinutes()).padStart(2,'0') + 'hours';
+            
+            doc.setFontSize(9).setFont("helvetica", "italic").setTextColor(0,0,0); 
+            doc.text(`This PO is created by ${creator} on ${cDateStr}.`, 14, finalY + 30);
+
+            // 2. Approved By Line (Only if Approved)
+            if (data.status === 'Approved') {
+                const now = new Date();
+                const aDateStr = now.toLocaleDateString('en-GB') + ' @ ' + String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0') + 'hours';
+                doc.text(`This PO is digitally approved by ${data.approved_by} on ${aDateStr}, no signature is required.`, 14, finalY + 35);
+            }
+            
             doc.save(`${data.po_number}.pdf`);
         }
 
@@ -313,7 +356,22 @@
         document.getElementById('po-form').onsubmit = async function(e) {
             e.preventDefault(); const items = []; let sub = 0, tax = 0;
             document.querySelectorAll('.item-row').forEach(row => { const f = row.querySelectorAll('input'); const qty = parseFloat(f[1].value), pr = parseFloat(f[3].value), amt = qty * pr, sstP = parseFloat(f[4].value || 0); sub += amt; tax += (amt * sstP / 100); items.push({ desc: f[0].value, qty, unit: f[2].value, price: pr, sst: sstP }); });
-            const payload = { po_number: document.getElementById('po-no').value, po_date: document.getElementById('po-date').value, company_key: document.getElementById('issuing-company').value, company_name: CO_DATA[document.getElementById('issuing-company').value].name, supplier_name: document.getElementById('supplier-name').value, supplier_address: document.getElementById('supplier-address').value, items: items, total_amount: sub + tax, status: 'Pending' };
+            
+            // --- CLEAN PAYLOAD (MATCHES NEW DB) ---
+            const payload = { 
+                po_number: document.getElementById('po-no').value, 
+                po_date: document.getElementById('po-date').value, 
+                company_key: document.getElementById('issuing-company').value, 
+                company_name: CO_DATA[document.getElementById('issuing-company').value].name, 
+                supplier_name: document.getElementById('supplier-name').value, 
+                supplier_address: document.getElementById('supplier-address').value, 
+                created_by: document.getElementById('creator-name').value,
+                creator_email: document.getElementById('creator-email').value,
+                items: items, 
+                total_amount: sub + tax, 
+                status: 'Pending' 
+            };
+            
             if (editingId) { await supabaseClient.from('po_logs').update(payload).eq('id', editingId); alert("PO Updated & Resubmitted"); } else { await supabaseClient.from('po_logs').insert(payload); alert("PO Submitted"); }
             emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, { system_name: "ITAKE PO SYSTEM", header_bg: "#059669", title: editingId ? "PO Resubmitted" : "New PO Request", html_body: createRow("PO Number", payload.po_number) + createRow("Company", payload.company_name) + createRow("Supplier", payload.supplier_name) + createRow("Total Amount", "RM " + formatRM(payload.total_amount)), remark_text: editingId ? `PO Number ${payload.po_number} corrected and resubmitted.` : "Please review via Admin Portal." });
             cancelEdit(); 
