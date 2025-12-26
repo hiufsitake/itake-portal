@@ -89,6 +89,7 @@
                     <section class="bg-white p-6 rounded-[2rem] shadow-sm border space-y-3">
                         <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400 italic">Claimant</h2>
                         <input type="text" id="claimant-name" placeholder="Full Name" class="input-box" required>
+                        <input type="email" id="claimant-email" placeholder="Email Address" class="input-box" required>
                         <input type="text" id="claimant-nric" placeholder="NRIC No." class="input-box" required>
                         <input type="text" id="claimant-phone" placeholder="H/P No." class="input-box" required>
                     </section>
@@ -162,7 +163,7 @@
 
         // AUTO LOGOUT CONFIGURATION (15 Minutes)
         let inactivityTimeout;
-        const TIMEOUT_DURATION = 900000; // 15 Minutes in milliseconds (15 * 60 * 1000)
+        const TIMEOUT_DURATION = 900000; // 15 Minutes
 
         function resetInactivityTimer() {
             clearTimeout(inactivityTimeout);
@@ -254,7 +255,10 @@
         function loadClaimForEdit(id) {
             const cc = currentClaims.find(p => p.id === id);
             if (!cc) return; editingId = id; switchTab('create');
-            document.getElementById('issuing-company').value = cc.company_key; document.getElementById('claim-no').value = cc.claim_number; document.getElementById('claim-date').value = cc.submission_date; document.getElementById('claimant-name').value = cc.claimant_name; document.getElementById('claimant-nric').value = cc.claimant_nric; document.getElementById('claimant-phone').value = cc.claimant_phone; document.getElementById('payable-name').value = cc.payable_name; document.getElementById('project-name').value = cc.project; document.getElementById('bank-details').value = cc.bank_details;
+            document.getElementById('issuing-company').value = cc.company_key; document.getElementById('claim-no').value = cc.claim_number; document.getElementById('claim-date').value = cc.submission_date; document.getElementById('claimant-name').value = cc.claimant_name; 
+            // ADDED: Load Email
+            document.getElementById('claimant-email').value = cc.claimant_email || '';
+            document.getElementById('claimant-nric').value = cc.claimant_nric; document.getElementById('claimant-phone').value = cc.claimant_phone; document.getElementById('payable-name').value = cc.payable_name; document.getElementById('project-name').value = cc.project; document.getElementById('bank-details').value = cc.bank_details;
             const container = document.getElementById('items-list'); container.innerHTML = '';
             cc.items.forEach(item => { addItemRow(); const rows = document.querySelectorAll('.item-row'); const lastRow = rows[rows.length - 1]; const inputs = lastRow.querySelectorAll('input'); inputs[0].value = item.desc; inputs[1].value = item.qty; inputs[2].value = item.price; });
             document.getElementById('submit-btn').innerHTML = `<i data-lucide="save" class="w-5 h-5"></i> Update & Resubmit`; document.getElementById('cancel-edit-btn').classList.remove('hidden'); lucide.createIcons(); window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -269,7 +273,16 @@
             const ccData = currentClaims.find(p => p.id === id);
             if(ccData) {
                 const color = newStatus === 'Approved' ? "#10b981" : "#ef4444";
-                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, { system_name: "ITAKE CLAIM SYSTEM", header_bg: color, title: `Claim ${newStatus}`, html_body: createRow("Claim No", ccData.claim_number) + createRow("Status", newStatus.toUpperCase()) + createRow("Action By", approver) + createRow("Total", "RM " + formatRM(ccData.total_amount)), remark_text: reasonInput || (newStatus === 'Approved' ? "Your claim is approved." : "Rejected for review.") });
+                emailjs.send(EMAIL_SERVICE, EMAIL_TEMPLATE, { 
+                    system_name: "ITAKE CLAIM SYSTEM", 
+                    header_bg: color, 
+                    title: `Claim ${newStatus}`, 
+                    // UPDATED: Dynamic Email
+                    to_email: ccData.claimant_email,
+                    to_name: ccData.claimant_name,
+                    html_body: createRow("Claim No", ccData.claim_number) + createRow("Status", newStatus.toUpperCase()) + createRow("Action By", approver) + createRow("Total", "RM " + formatRM(ccData.total_amount)), 
+                    remark_text: reasonInput || (newStatus === 'Approved' ? "Your claim is approved." : "Rejected for review.") 
+                });
             }
             fetchRecords();
         }
@@ -278,7 +291,6 @@
             const data = currentClaims.find(p => p.id === id);
             const { jsPDF } = window.jspdf; const doc = new jsPDF(); const info = CO_DATA[data.company_key];
             
-            // Layout strictly according to your original Cash Claim format with added details
             doc.setFont("helvetica", "bold").setFontSize(14).text(info.name, 14, 25);
             doc.setFontSize(8).setFont("helvetica", "normal").text(`Company Reg. No.: ${info.reg}`, 14, 30);
             
@@ -344,7 +356,24 @@
         document.getElementById('claim-form').onsubmit = async function(e) {
             e.preventDefault(); const items = []; let sub = 0;
             document.querySelectorAll('.item-row').forEach(row => { const f = row.querySelectorAll('input'); const qty = parseFloat(f[1].value), pr = parseFloat(f[2].value); sub += (qty * pr); items.push({ desc: f[0].value, qty, price: pr }); });
-            const payload = { claim_number: document.getElementById('claim-no').value, company_key: document.getElementById('issuing-company').value, company_name: CO_DATA[document.getElementById('issuing-company').value].name, submission_date: document.getElementById('claim-date').value, claimant_name: document.getElementById('claimant-name').value, claimant_nric: document.getElementById('claimant-nric').value, claimant_phone: document.getElementById('claimant-phone').value, payable_name: document.getElementById('payable-name').value, bank_details: document.getElementById('bank-details').value, project: document.getElementById('project-name').value, items: items, total_amount: sub, status: 'Pending' };
+            
+            const payload = { 
+                claim_number: document.getElementById('claim-no').value, 
+                company_key: document.getElementById('issuing-company').value, 
+                company_name: CO_DATA[document.getElementById('issuing-company').value].name, 
+                submission_date: document.getElementById('claim-date').value, 
+                claimant_name: document.getElementById('claimant-name').value, 
+                // ADDED: Claimant Email
+                claimant_email: document.getElementById('claimant-email').value,
+                claimant_nric: document.getElementById('claimant-nric').value, 
+                claimant_phone: document.getElementById('claimant-phone').value, 
+                payable_name: document.getElementById('payable-name').value, 
+                bank_details: document.getElementById('bank-details').value, 
+                project: document.getElementById('project-name').value, 
+                items: items, 
+                total_amount: sub, 
+                status: 'Pending' 
+            };
             
             let res;
             if (editingId) res = await supabaseClient.from('cash_claims').update(payload).eq('id', editingId);
@@ -357,6 +386,13 @@
                 if(isAuthorized) fetchRecords();
             } else { alert("Error: " + res.error.message); }
         };
+
+        // --- ENTER KEY FOR PIN ---
+        document.getElementById('master-pin-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                checkMasterAuth();
+            }
+        });
 
         init();
     </script>
