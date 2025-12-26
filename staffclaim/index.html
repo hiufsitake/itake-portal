@@ -87,6 +87,7 @@
                     <section class="bg-white p-6 rounded-[2rem] shadow-sm border space-y-3">
                         <h2 class="font-black uppercase text-[10px] tracking-widest text-slate-400 italic">Claimant</h2>
                         <input type="text" id="staff-name" placeholder="Staff Full Name" class="input-box" required>
+                        <input type="email" id="staff-email" placeholder="Staff Email Address" class="input-box" required>
                     </section>
                 </div>
 
@@ -228,6 +229,9 @@
                     system_name: "ITAKE STAFF CLAIM SYSTEM", 
                     header_bg: color, 
                     title: `Staff Claim ${newStatus}`, 
+                    // UPDATED: Dynamic Recipient
+                    to_email: pcData.staff_email,
+                    to_name: pcData.staff_name,
                     html_body: createRow("Claim No", pcData.claim_number) + createRow("Status", newStatus.toUpperCase()) + createRow("Action By", approver) + createRow("Total", "RM " + formatRM(pcData.total_amount)), 
                     remark_text: remark || (newStatus === 'Approved' ? "Claim approved." : "Claim rejected.") 
                 });
@@ -300,6 +304,8 @@
                 company_key: document.getElementById('issuing-company').value, 
                 company_name: CO_DATA[document.getElementById('issuing-company').value].name, 
                 staff_name: document.getElementById('staff-name').value, 
+                // ADDED: Capture Email
+                staff_email: document.getElementById('staff-email').value,
                 submission_date: document.getElementById('submission-date').value, 
                 submitted_at: now,
                 items: items, 
