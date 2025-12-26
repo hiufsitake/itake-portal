@@ -1,10 +1,10 @@
 {
-  "name": "ITAKE Leave",
-  "short_name": "Leave",
+  "name": "ITAKE Operations",
+  "short_name": "ITAKE",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "icons": [
     {
       "src": "applogo.png",
