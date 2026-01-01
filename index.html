@@ -71,6 +71,23 @@
             <p id="error-msg" class="text-red-500 text-xs font-bold hidden bg-red-50 p-3 rounded-xl"></p>
         </div>
 
+        <div id="update-password-view" class="hidden space-y-6">
+            <div class="space-y-2">
+                <h2 class="text-xl font-black text-slate-800">Set New Password</h2>
+                <p class="text-xs font-bold text-slate-400">Secure your account with a new password.</p>
+            </div>
+            
+            <div class="space-y-4">
+                <input type="password" id="new-password" placeholder="Enter New Password" class="input-box" required>
+            </div>
+            
+            <button onclick="handlePasswordUpdate()" id="update-btn" class="w-full bg-emerald-500 text-white font-black p-5 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all">
+                Update Password
+            </button>
+            
+            <p id="update-msg" class="text-red-500 text-xs font-bold hidden bg-red-50 p-3 rounded-xl"></p>
+        </div>
+
         <div id="dashboard-view" class="hidden space-y-6">
             <div class="grid gap-5">
                 <a href="po/index.html" class="nav-card p-6 rounded-[2.25rem] flex items-center gap-6 text-left">
@@ -104,15 +121,15 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
         let isLoginMode = true;
-        let isResetMode = false; // NEW STATE
+        let isResetMode = false;
 
         async function initPortal() {
             const tabActive = sessionStorage.getItem('itake_tab_session');
             const { data: { session } } = await supabaseClient.auth.getSession();
 
             if (!tabActive && session) {
-                await supabaseClient.auth.signOut();
-                showAuth();
+                // If session exists but not flagged as active tab, check if it's a recovery
+                // If not recovery, we might sign out. But we wait for onAuthStateChange to handle recovery.
             } else if (session) {
                 showDashboard();
             } else {
@@ -121,43 +138,83 @@
             document.body.classList.add('loaded');
         }
 
-        // --- NEW: Detect if user is back from Reset Password Email ---
+        // --- AUTH STATE LISTENER ---
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth Event:", event);
+            
             if (event === 'PASSWORD_RECOVERY') {
-                // User clicked the email link. They are logged in now.
-                // We ask them for a new password immediately.
-                const newPassword = prompt("Please enter your new password:");
-                if (newPassword) {
-                    const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
-                    if (!error) alert("Password updated successfully!");
-                    else alert("Error updating password: " + error.message);
+                // CRITICAL: User clicked email link. Show the "Set New Password" screen.
+                showUpdatePasswordView();
+            } 
+            else if (event === 'SIGNED_IN') {
+                // Only go to dashboard if NOT in recovery mode (recovery handles its own flow)
+                // We check if the URL has 'type=recovery' just in case
+                const isRecovery = window.location.hash.includes('type=recovery');
+                if (!isRecovery) {
+                    sessionStorage.setItem('itake_tab_session', 'true');
+                    showDashboard();
                 }
-                showDashboard();
-            } else if (event === 'SIGNED_IN') {
-                sessionStorage.setItem('itake_tab_session', 'true');
-                showDashboard();
-            } else if (event === 'SIGNED_OUT') {
+            } 
+            else if (event === 'SIGNED_OUT') {
                 sessionStorage.removeItem('itake_tab_session');
                 showAuth();
             }
         });
 
+        // --- VIEW SWITCHERS ---
         function showDashboard() {
-            document.getElementById('auth-view').classList.add('hidden');
+            hideAllViews();
             document.getElementById('dashboard-view').classList.remove('hidden');
         }
 
         function showAuth() {
-            document.getElementById('dashboard-view').classList.add('hidden');
+            hideAllViews();
             document.getElementById('auth-view').classList.remove('hidden');
-            // Ensure we reset to login state when showing auth
-            if(isResetMode) toggleResetMode();
+            if(isResetMode) toggleResetMode(); // Ensure clean login state
         }
 
-        // --- NEW: Toggle between Login and Reset Mode ---
+        function showUpdatePasswordView() {
+            hideAllViews();
+            document.getElementById('update-password-view').classList.remove('hidden');
+        }
+
+        function hideAllViews() {
+            document.getElementById('auth-view').classList.add('hidden');
+            document.getElementById('dashboard-view').classList.add('hidden');
+            document.getElementById('update-password-view').classList.add('hidden');
+        }
+
+        // --- NEW PASSWORD LOGIC ---
+        async function handlePasswordUpdate() {
+            const newPassword = document.getElementById('new-password').value;
+            const btn = document.getElementById('update-btn');
+            const msg = document.getElementById('update-msg');
+
+            if (!newPassword) {
+                msg.innerText = "Please enter a new password.";
+                msg.classList.remove('hidden');
+                return;
+            }
+
+            btn.innerHTML = '<span class="animate-pulse">Updating...</span>';
+            msg.classList.add('hidden');
+
+            const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+
+            if (error) {
+                msg.innerText = error.message;
+                msg.classList.remove('hidden');
+                btn.innerText = "Update Password";
+            } else {
+                alert("Success! Your password has been updated. Logging you in...");
+                showDashboard();
+            }
+        }
+
+        // --- LOGIN / RESET REQUEST TOGGLES ---
         function toggleResetMode() {
             isResetMode = !isResetMode;
-            isLoginMode = true; // Reset mode is a sub-state of login visually
+            isLoginMode = true;
 
             const title = document.getElementById('auth-title');
             const subtitle = document.getElementById('auth-subtitle');
@@ -170,15 +227,13 @@
             error.classList.add('hidden');
 
             if (isResetMode) {
-                // RESET MODE UI
                 title.innerText = "Reset Password";
                 subtitle.innerText = "Enter your email to receive a reset link.";
-                passwordInput.classList.add('hidden-force'); // Hide password
-                forgotLink.classList.add('hidden-force'); // Hide the link itself
+                passwordInput.classList.add('hidden-force'); 
+                forgotLink.classList.add('hidden-force');
                 btn.innerText = "Send Reset Link";
                 toggle.innerText = "Back to Login";
             } else {
-                // BACK TO LOGIN UI
                 title.innerText = "Welcome";
                 subtitle.innerText = "Please login to access the system.";
                 passwordInput.classList.remove('hidden-force');
@@ -189,12 +244,10 @@
         }
 
         function toggleAuthMode() {
-            // If we are in Reset mode, the toggle button acts as "Back to Login"
             if (isResetMode) {
                 toggleResetMode();
                 return;
             }
-
             isLoginMode = !isLoginMode;
             const title = document.getElementById('auth-title');
             const subtitle = document.getElementById('auth-subtitle');
@@ -210,13 +263,13 @@
                 subtitle.innerText = "Please login to access the system.";
                 btn.innerText = "Login";
                 toggle.innerText = "Create New Account";
-                forgotLink.classList.remove('hidden-force'); // Show forgot link in login
+                forgotLink.classList.remove('hidden-force');
             } else {
                 title.innerText = "Create Account";
                 subtitle.innerText = "Enter your details to register.";
                 btn.innerText = "Sign Up";
                 toggle.innerText = "Back to Login";
-                forgotLink.classList.add('hidden-force'); // Hide forgot link in signup
+                forgotLink.classList.add('hidden-force');
             }
         }
 
@@ -226,13 +279,11 @@
             const btn = document.getElementById('submit-btn');
             const errorMsg = document.getElementById('error-msg');
             
-            // Validation Logic
             if (!email) {
                 errorMsg.innerText = "Please enter your email.";
                 errorMsg.classList.remove('hidden');
                 return;
             }
-            // Password required only if NOT in reset mode
             if (!isResetMode && !password) {
                 errorMsg.innerText = "Please enter your password.";
                 errorMsg.classList.remove('hidden');
@@ -242,10 +293,10 @@
             btn.innerHTML = '<span class="animate-pulse">Processing...</span>';
             errorMsg.classList.add('hidden');
 
-            // --- NEW: Reset Password Logic ---
+            // --- RESET REQUEST ---
             if (isResetMode) {
                 const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-                    redirectTo: window.location.href // Redirect back here after clicking email
+                    redirectTo: window.location.href 
                 });
                 
                 if (error) {
@@ -254,12 +305,12 @@
                     btn.innerText = "Send Reset Link";
                 } else {
                     alert("Reset link sent! Check your email.");
-                    toggleResetMode(); // Go back to login screen
+                    toggleResetMode();
                 }
                 return;
             }
-            // --------------------------------
 
+            // --- LOGIN / SIGNUP ---
             if (isLoginMode) {
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 if (error) {
@@ -294,9 +345,7 @@
         }
 
         document.getElementById('password').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                handleAuth();
-            }
+            if (e.key === 'Enter') handleAuth();
         });
 
         lucide.createIcons();
