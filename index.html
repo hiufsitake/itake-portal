@@ -124,12 +124,18 @@
         let isResetMode = false;
 
         async function initPortal() {
+            // FIX: Check for recovery hash immediately upon load
+            if (window.location.hash && window.location.hash.includes('type=recovery')) {
+                showUpdatePasswordView();
+                document.body.classList.add('loaded');
+                return;
+            }
+
             const tabActive = sessionStorage.getItem('itake_tab_session');
             const { data: { session } } = await supabaseClient.auth.getSession();
 
             if (!tabActive && session) {
-                // If session exists but not flagged as active tab, check if it's a recovery
-                // If not recovery, we might sign out. But we wait for onAuthStateChange to handle recovery.
+               // Optional: Auto logout if tab session missing
             } else if (session) {
                 showDashboard();
             } else {
@@ -138,22 +144,26 @@
             document.body.classList.add('loaded');
         }
 
-        // --- AUTH STATE LISTENER ---
+        // --- AUTH STATE LISTENER (FIXED) ---
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             console.log("Auth Event:", event);
             
+            // Priority 1: Check for explicit Recovery Event
             if (event === 'PASSWORD_RECOVERY') {
-                // CRITICAL: User clicked email link. Show the "Set New Password" screen.
                 showUpdatePasswordView();
-            } 
-            else if (event === 'SIGNED_IN') {
-                // Only go to dashboard if NOT in recovery mode (recovery handles its own flow)
-                // We check if the URL has 'type=recovery' just in case
-                const isRecovery = window.location.hash.includes('type=recovery');
-                if (!isRecovery) {
-                    sessionStorage.setItem('itake_tab_session', 'true');
-                    showDashboard();
-                }
+                return;
+            }
+
+            // Priority 2: Check URL Hash for recovery (Failsafe for race conditions)
+            if (window.location.hash && window.location.hash.includes('type=recovery')) {
+                showUpdatePasswordView();
+                return;
+            }
+
+            // Priority 3: Normal Login
+            if (event === 'SIGNED_IN') {
+                sessionStorage.setItem('itake_tab_session', 'true');
+                showDashboard();
             } 
             else if (event === 'SIGNED_OUT') {
                 sessionStorage.removeItem('itake_tab_session');
@@ -170,7 +180,7 @@
         function showAuth() {
             hideAllViews();
             document.getElementById('auth-view').classList.remove('hidden');
-            if(isResetMode) toggleResetMode(); // Ensure clean login state
+            if(isResetMode) toggleResetMode(); 
         }
 
         function showUpdatePasswordView() {
@@ -207,6 +217,8 @@
                 btn.innerText = "Update Password";
             } else {
                 alert("Success! Your password has been updated. Logging you in...");
+                // Clear the hash so a refresh doesn't trigger recovery again
+                window.history.replaceState(null, '', window.location.pathname);
                 showDashboard();
             }
         }
@@ -341,7 +353,8 @@
 
         async function handleLogout() {
             await supabaseClient.auth.signOut();
-            window.location.reload(); 
+            // Clear URL params to ensure clean reload
+            window.location.href = window.location.pathname; 
         }
 
         document.getElementById('password').addEventListener('keypress', function (e) {
