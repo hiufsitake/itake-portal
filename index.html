@@ -178,13 +178,23 @@
                     btn.innerText = "Login";
                 }
             } else {
-                const { error } = await supabaseClient.auth.signUp({ email, password });
+                // --- MODIFIED SECTION START ---
+                // Added options: { emailRedirectTo: ... } to direct user back to this page
+                const { error } = await supabaseClient.auth.signUp({ 
+                    email, 
+                    password,
+                    options: {
+                        emailRedirectTo: window.location.href
+                    }
+                });
+                // --- MODIFIED SECTION END ---
+
                 if (error) {
                     errorMsg.innerText = error.message;
                     errorMsg.classList.remove('hidden');
                     btn.innerText = "Sign Up";
                 } else {
-                    alert("Account created! You can now login.");
+                    alert("Account created! Check your email to confirm.");
                     toggleAuthMode();
                     btn.innerText = "Login";
                 }
@@ -196,7 +206,6 @@
             window.location.reload(); 
         }
 
-        // --- NEW FEATURE: TRIGGER LOGIN ON ENTER KEY ---
         document.getElementById('password').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 handleAuth();
@@ -208,7 +217,3 @@
     </script>
 </body>
 </html>
-
-
-
-
