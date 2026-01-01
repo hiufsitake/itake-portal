@@ -29,6 +29,7 @@
         .input-box:focus { border-color: #10b981; background: white; }
         .nav-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid #f8fafc; background: #ffffff; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
         .nav-card:hover { border-color: #10b981; transform: translateY(-3px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); }
+        .hidden-force { display: none !important; }
     </style>
 </head>
 <body class="bg-white min-h-screen flex flex-col items-center justify-center p-6">
@@ -45,9 +46,16 @@
                 <h2 id="auth-title" class="text-xl font-black text-slate-800">Welcome</h2>
                 <p id="auth-subtitle" class="text-xs font-bold text-slate-400">Please login to access the system.</p>
             </div>
+            
             <div class="space-y-4">
                 <input type="email" id="email" placeholder="Email Address" class="input-box" required>
                 <input type="password" id="password" placeholder="Password" class="input-box" required>
+                
+                <div id="forgot-link-box" class="text-right">
+                    <button onclick="toggleResetMode()" class="text-[10px] font-bold text-slate-400 hover:text-emerald-500 uppercase tracking-widest">
+                        Forgot Password?
+                    </button>
+                </div>
             </div>
             
             <div class="flex flex-col gap-3">
@@ -96,6 +104,7 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         
         let isLoginMode = true;
+        let isResetMode = false; // NEW STATE
 
         async function initPortal() {
             const tabActive = sessionStorage.getItem('itake_tab_session');
@@ -112,8 +121,19 @@
             document.body.classList.add('loaded');
         }
 
-        supabaseClient.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN') {
+        // --- NEW: Detect if user is back from Reset Password Email ---
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+                // User clicked the email link. They are logged in now.
+                // We ask them for a new password immediately.
+                const newPassword = prompt("Please enter your new password:");
+                if (newPassword) {
+                    const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+                    if (!error) alert("Password updated successfully!");
+                    else alert("Error updating password: " + error.message);
+                }
+                showDashboard();
+            } else if (event === 'SIGNED_IN') {
                 sessionStorage.setItem('itake_tab_session', 'true');
                 showDashboard();
             } else if (event === 'SIGNED_OUT') {
@@ -130,14 +150,57 @@
         function showAuth() {
             document.getElementById('dashboard-view').classList.add('hidden');
             document.getElementById('auth-view').classList.remove('hidden');
+            // Ensure we reset to login state when showing auth
+            if(isResetMode) toggleResetMode();
+        }
+
+        // --- NEW: Toggle between Login and Reset Mode ---
+        function toggleResetMode() {
+            isResetMode = !isResetMode;
+            isLoginMode = true; // Reset mode is a sub-state of login visually
+
+            const title = document.getElementById('auth-title');
+            const subtitle = document.getElementById('auth-subtitle');
+            const btn = document.getElementById('submit-btn');
+            const toggle = document.getElementById('toggle-btn');
+            const passwordInput = document.getElementById('password');
+            const forgotLink = document.getElementById('forgot-link-box');
+            const error = document.getElementById('error-msg');
+            
+            error.classList.add('hidden');
+
+            if (isResetMode) {
+                // RESET MODE UI
+                title.innerText = "Reset Password";
+                subtitle.innerText = "Enter your email to receive a reset link.";
+                passwordInput.classList.add('hidden-force'); // Hide password
+                forgotLink.classList.add('hidden-force'); // Hide the link itself
+                btn.innerText = "Send Reset Link";
+                toggle.innerText = "Back to Login";
+            } else {
+                // BACK TO LOGIN UI
+                title.innerText = "Welcome";
+                subtitle.innerText = "Please login to access the system.";
+                passwordInput.classList.remove('hidden-force');
+                forgotLink.classList.remove('hidden-force');
+                btn.innerText = "Login";
+                toggle.innerText = "Create New Account";
+            }
         }
 
         function toggleAuthMode() {
+            // If we are in Reset mode, the toggle button acts as "Back to Login"
+            if (isResetMode) {
+                toggleResetMode();
+                return;
+            }
+
             isLoginMode = !isLoginMode;
             const title = document.getElementById('auth-title');
             const subtitle = document.getElementById('auth-subtitle');
             const btn = document.getElementById('submit-btn');
             const toggle = document.getElementById('toggle-btn');
+            const forgotLink = document.getElementById('forgot-link-box');
             const error = document.getElementById('error-msg');
 
             error.classList.add('hidden');
@@ -147,11 +210,13 @@
                 subtitle.innerText = "Please login to access the system.";
                 btn.innerText = "Login";
                 toggle.innerText = "Create New Account";
+                forgotLink.classList.remove('hidden-force'); // Show forgot link in login
             } else {
                 title.innerText = "Create Account";
                 subtitle.innerText = "Enter your details to register.";
                 btn.innerText = "Sign Up";
                 toggle.innerText = "Back to Login";
+                forgotLink.classList.add('hidden-force'); // Hide forgot link in signup
             }
         }
 
@@ -161,14 +226,39 @@
             const btn = document.getElementById('submit-btn');
             const errorMsg = document.getElementById('error-msg');
             
-            if (!email || !password) {
-                errorMsg.innerText = "Please enter both email and password.";
+            // Validation Logic
+            if (!email) {
+                errorMsg.innerText = "Please enter your email.";
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            // Password required only if NOT in reset mode
+            if (!isResetMode && !password) {
+                errorMsg.innerText = "Please enter your password.";
                 errorMsg.classList.remove('hidden');
                 return;
             }
 
             btn.innerHTML = '<span class="animate-pulse">Processing...</span>';
             errorMsg.classList.add('hidden');
+
+            // --- NEW: Reset Password Logic ---
+            if (isResetMode) {
+                const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.href // Redirect back here after clicking email
+                });
+                
+                if (error) {
+                    errorMsg.innerText = error.message;
+                    errorMsg.classList.remove('hidden');
+                    btn.innerText = "Send Reset Link";
+                } else {
+                    alert("Reset link sent! Check your email.");
+                    toggleResetMode(); // Go back to login screen
+                }
+                return;
+            }
+            // --------------------------------
 
             if (isLoginMode) {
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
@@ -178,8 +268,6 @@
                     btn.innerText = "Login";
                 }
             } else {
-                // --- MODIFIED SECTION START ---
-                // Added options: { emailRedirectTo: ... } to direct user back to this page
                 const { error } = await supabaseClient.auth.signUp({ 
                     email, 
                     password,
@@ -187,7 +275,6 @@
                         emailRedirectTo: window.location.href
                     }
                 });
-                // --- MODIFIED SECTION END ---
 
                 if (error) {
                     errorMsg.innerText = error.message;
