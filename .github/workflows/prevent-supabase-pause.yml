@@ -2,9 +2,9 @@ name: Prevent Supabase Pause
 
 on:
   schedule:
-    # Runs at 00:00 UTC on Monday and Thursday
-    - cron: '0 0 * * 1,4'
-  workflow_dispatch:
+    # Runs at 08:00 AM Malaysia Time (00:00 UTC) EVERY DAY
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows manual trigger for testing
 
 jobs:
   ping:
@@ -12,10 +12,22 @@ jobs:
     steps:
       - name: Ping Supabase Database
         env:
-          # Your specific project key provided above
-          SUPABASE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6YXFoZGZudHljY3lmZXZjb2NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMDUwMzksImV4cCI6MjA4MTY4MTAzOX0.DhcUsqkPsEMun_G-1EUX233eUWSoOkAVl0wFQ2R91Oo
+          # Pulls the key from GitHub Secrets
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          # YOUR PROJECT ID
+          PROJECT_ID: lzaqhdfntyccyfevcocd
         run: |
-          # Sends a request to your project (lzaqhdfntyccyfevcocd)
-          curl -f -X GET 'https://lzaqhdfntyccyfevcocd.supabase.co/rest/v1/' \
-          -H "apikey: $SUPABASE_KEY" \
-          -H "Authorization: Bearer $SUPABASE_KEY"
+          echo "Pinging Supabase Project: $PROJECT_ID..."
+          
+          # We use the /rest/v1/ endpoint which counts as activity
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "https://$PROJECT_ID.supabase.co/rest/v1/" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY")
+            
+          if [ "$response" -eq 200 ]; then
+            echo "Success! Supabase responded with 200 OK."
+          else
+            echo "Failed! Supabase responded with code: $response"
+            exit 1
+          fi
