@@ -76,15 +76,12 @@
                 <h2 class="text-xl font-black text-slate-800">Set New Password</h2>
                 <p class="text-xs font-bold text-slate-400">Secure your account with a new password.</p>
             </div>
-            
             <div class="space-y-4">
                 <input type="password" id="new-password" placeholder="Enter New Password" class="input-box" required>
             </div>
-            
             <button onclick="handlePasswordUpdate()" id="update-btn" class="w-full bg-emerald-500 text-white font-black p-5 rounded-[2rem] shadow-xl uppercase tracking-widest text-xs hover:bg-emerald-600 transition-all">
                 Update Password
             </button>
-            
             <p id="update-msg" class="text-red-500 text-xs font-bold hidden bg-red-50 p-3 rounded-xl"></p>
         </div>
 
@@ -122,15 +119,23 @@
         
         let isLoginMode = true;
         let isResetMode = false;
-        
-        // Timer Variables
         let inactivityTimeout;
         const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 Minutes
 
         async function initPortal() {
-            // Check for recovery URL first
-            const isRecovery = window.location.hash && window.location.hash.includes('type=recovery');
+            // 1. REFRESH DETECTION (The Fix)
+            // If the user hit Refresh/F5, perform a forced logout immediately.
+            try {
+                const navEntries = performance.getEntriesByType("navigation");
+                if (navEntries.length > 0 && navEntries[0].type === "reload") {
+                    console.log("Refresh detected. Forcing logout.");
+                    await handleLogout();
+                    return; 
+                }
+            } catch (e) { console.log("Nav check failed, ignoring."); }
 
+            // 2. Password Recovery Check
+            const isRecovery = window.location.hash && window.location.hash.includes('type=recovery');
             if (isRecovery) {
                 showUpdatePasswordView();
                 startInactivityTimer();
@@ -138,19 +143,16 @@
                 return;
             }
 
-            // Normal load
+            // 3. Session Check
             const { data: { session } } = await supabaseClient.auth.getSession();
             const tabActive = sessionStorage.getItem('itake_tab_session');
 
             if (session) {
-                // If session exists, we STRICTLY check if this tab is authorized.
                 if (tabActive) {
                     showDashboard();
                     startInactivityTimer();
                 } else {
-                    // Session exists (phantom/zombie session) but Tab Key is missing.
-                    // This happens on "Reopen Closed Tab" or "Forced Sign Out".
-                    // ACTION: KILL SESSION.
+                    // Unauthorized tab or dead session -> Kill it.
                     await supabaseClient.auth.signOut();
                     showAuth();
                 }
@@ -160,9 +162,8 @@
             document.body.classList.add('loaded');
         }
 
-        // --- AUTH EVENT LISTENER (FIXED) ---
+        // --- AUTH EVENT LISTENER ---
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            // Handle Password Recovery
             if (event === 'PASSWORD_RECOVERY' || (window.location.hash && window.location.hash.includes('type=recovery'))) {
                 showUpdatePasswordView();
                 startInactivityTimer();
@@ -170,16 +171,12 @@
             }
 
             if (event === 'SIGNED_IN') {
-                // CRITICAL FIX: Do not blindly trust the SIGNED_IN event.
-                // Only proceed if the Tab Session Key is present.
                 const isTabAuthorized = sessionStorage.getItem('itake_tab_session');
-                
                 if (isTabAuthorized) {
                     showDashboard();
                     startInactivityTimer();
                 } else {
-                    // If event says "Signed In" but our Tab Key is missing, 
-                    // it is an unauthorized persisted session. Sign out immediately.
+                    // Prevent auto-login if tab key is missing (zombie session)
                     await supabaseClient.auth.signOut();
                     showAuth();
                 }
@@ -219,18 +216,15 @@
             hideAllViews();
             document.getElementById('dashboard-view').classList.remove('hidden');
         }
-
         function showAuth() {
             hideAllViews();
             document.getElementById('auth-view').classList.remove('hidden');
             if(isResetMode) toggleResetMode(); 
         }
-
         function showUpdatePasswordView() {
             hideAllViews();
             document.getElementById('update-password-view').classList.remove('hidden');
         }
-
         function hideAllViews() {
             document.getElementById('auth-view').classList.add('hidden');
             document.getElementById('dashboard-view').classList.add('hidden');
@@ -248,7 +242,6 @@
                 msg.classList.remove('hidden');
                 return;
             }
-
             btn.innerHTML = '<span class="animate-pulse">Updating...</span>';
             msg.classList.add('hidden');
 
@@ -260,7 +253,7 @@
                 btn.innerText = "Update Password";
             } else {
                 alert("Success! Logging you in...");
-                sessionStorage.setItem('itake_tab_session', 'true'); // Authorize this tab
+                sessionStorage.setItem('itake_tab_session', 'true');
                 window.history.replaceState(null, '', window.location.pathname);
                 showDashboard();
                 startInactivityTimer();
@@ -270,6 +263,7 @@
         function toggleResetMode() {
             isResetMode = !isResetMode;
             isLoginMode = true;
+            // UI Toggling Logic
             const title = document.getElementById('auth-title');
             const subtitle = document.getElementById('auth-subtitle');
             const btn = document.getElementById('submit-btn');
@@ -303,13 +297,13 @@
                 return;
             }
             isLoginMode = !isLoginMode;
+            // UI Toggling Logic
             const title = document.getElementById('auth-title');
             const subtitle = document.getElementById('auth-subtitle');
             const btn = document.getElementById('submit-btn');
             const toggle = document.getElementById('toggle-btn');
             const forgotLink = document.getElementById('forgot-link-box');
             const error = document.getElementById('error-msg');
-
             error.classList.add('hidden');
 
             if (isLoginMode) {
@@ -347,12 +341,11 @@
             btn.innerHTML = '<span class="animate-pulse">Processing...</span>';
             errorMsg.classList.add('hidden');
 
-            // --- RESET REQUEST ---
+            // Reset Request
             if (isResetMode) {
                 const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
                     redirectTo: window.location.href 
                 });
-                
                 if (error) {
                     errorMsg.innerText = error.message;
                     errorMsg.classList.remove('hidden');
@@ -364,16 +357,13 @@
                 return;
             }
 
-            // --- LOGIN / SIGNUP ---
+            // Login / Signup
             if (isLoginMode) {
-                // CRITICAL: We set the tab session key BEFORE Supabase finishes login.
-                // This ensures the Event Listener knows we intended to login.
+                // Set Key Attempt
                 sessionStorage.setItem('itake_tab_session', 'true');
-
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
                 
                 if (error) {
-                    // Login failed, remove the key so we don't accidentally authorize
                     sessionStorage.removeItem('itake_tab_session');
                     errorMsg.innerText = error.message;
                     errorMsg.classList.remove('hidden');
@@ -383,11 +373,8 @@
                 const { error } = await supabaseClient.auth.signUp({ 
                     email, 
                     password,
-                    options: {
-                        emailRedirectTo: window.location.href
-                    }
+                    options: { emailRedirectTo: window.location.href }
                 });
-
                 if (error) {
                     errorMsg.innerText = error.message;
                     errorMsg.classList.remove('hidden');
@@ -402,11 +389,13 @@
 
         async function handleLogout() {
             stopInactivityTimer();
-            // 1. Destroy the Tab Key first
+            // Clear Key
             sessionStorage.removeItem('itake_tab_session');
-            // 2. Destroy the Supabase Session
+            // Brute Force Clear LocalStorage (Fixes the "Cant sign out" bug)
+            localStorage.clear(); 
+            // Sign out Supabase
             await supabaseClient.auth.signOut();
-            // 3. Force clean reload
+            // Reload
             window.location.href = window.location.pathname; 
         }
 
