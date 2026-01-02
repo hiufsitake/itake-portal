@@ -123,51 +123,81 @@
         let isLoginMode = true;
         let isResetMode = false;
         
-        // --- NEW: Inactivity Variables ---
+        // Timer Variables
         let inactivityTimeout;
-        const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 Minutes in milliseconds
+        const INACTIVITY_LIMIT = 10 * 60 * 1000; // 10 Minutes
 
         async function initPortal() {
-            // 1. Check if user is coming from Password Reset Link
+            // Check for recovery URL first
             const isRecovery = window.location.hash && window.location.hash.includes('type=recovery');
 
             if (isRecovery) {
-                // Allow password reset, but start timer so they don't leave it open forever
                 showUpdatePasswordView();
                 startInactivityTimer();
                 document.body.classList.add('loaded');
                 return;
             }
 
-            const tabActive = sessionStorage.getItem('itake_tab_session');
+            // Normal load
             const { data: { session } } = await supabaseClient.auth.getSession();
+            const tabActive = sessionStorage.getItem('itake_tab_session');
 
-            // 2. Original "Tab Guard": If session exists but tab is fresh -> Logout
-            if (!tabActive && session) {
-                await supabaseClient.auth.signOut();
-                showAuth();
-            } else if (session) {
-                showDashboard();
-                // 3. Start the 10-minute timer
-                startInactivityTimer();
+            if (session) {
+                // If session exists, we STRICTLY check if this tab is authorized.
+                if (tabActive) {
+                    showDashboard();
+                    startInactivityTimer();
+                } else {
+                    // Session exists (phantom/zombie session) but Tab Key is missing.
+                    // This happens on "Reopen Closed Tab" or "Forced Sign Out".
+                    // ACTION: KILL SESSION.
+                    await supabaseClient.auth.signOut();
+                    showAuth();
+                }
             } else {
                 showAuth();
             }
             document.body.classList.add('loaded');
         }
 
-        // --- NEW: Inactivity Timer Logic ---
+        // --- AUTH EVENT LISTENER (FIXED) ---
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            // Handle Password Recovery
+            if (event === 'PASSWORD_RECOVERY' || (window.location.hash && window.location.hash.includes('type=recovery'))) {
+                showUpdatePasswordView();
+                startInactivityTimer();
+                return;
+            }
+
+            if (event === 'SIGNED_IN') {
+                // CRITICAL FIX: Do not blindly trust the SIGNED_IN event.
+                // Only proceed if the Tab Session Key is present.
+                const isTabAuthorized = sessionStorage.getItem('itake_tab_session');
+                
+                if (isTabAuthorized) {
+                    showDashboard();
+                    startInactivityTimer();
+                } else {
+                    // If event says "Signed In" but our Tab Key is missing, 
+                    // it is an unauthorized persisted session. Sign out immediately.
+                    await supabaseClient.auth.signOut();
+                    showAuth();
+                }
+            } 
+            else if (event === 'SIGNED_OUT') {
+                stopInactivityTimer();
+                sessionStorage.removeItem('itake_tab_session');
+                showAuth();
+            }
+        });
+
+        // --- TIMER LOGIC ---
         function startInactivityTimer() {
-            // Clear any existing timer first
             clearTimeout(inactivityTimeout);
-            
-            // Set events that reset the timer
             document.onmousemove = resetInactivityTimer;
             document.onkeypress = resetInactivityTimer;
             document.onclick = resetInactivityTimer;
-            document.ontouchstart = resetInactivityTimer; // for mobile
-            
-            // Start the initial countdown
+            document.ontouchstart = resetInactivityTimer;
             inactivityTimeout = setTimeout(handleLogout, INACTIVITY_LIMIT);
         }
 
@@ -178,34 +208,11 @@
 
         function stopInactivityTimer() {
             clearTimeout(inactivityTimeout);
-            // Remove listeners to save resources
             document.onmousemove = null;
             document.onkeypress = null;
             document.onclick = null;
             document.ontouchstart = null;
         }
-        // ------------------------------------
-
-        // --- AUTH STATE LISTENER ---
-        supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            
-            if (event === 'PASSWORD_RECOVERY' || (window.location.hash && window.location.hash.includes('type=recovery'))) {
-                showUpdatePasswordView();
-                startInactivityTimer(); // Protect this screen too
-                return;
-            }
-
-            if (event === 'SIGNED_IN') {
-                sessionStorage.setItem('itake_tab_session', 'true');
-                showDashboard();
-                startInactivityTimer(); // Start tracking
-            } 
-            else if (event === 'SIGNED_OUT') {
-                sessionStorage.removeItem('itake_tab_session');
-                stopInactivityTimer(); // Stop tracking
-                showAuth();
-            }
-        });
 
         // --- VIEW SWITCHERS ---
         function showDashboard() {
@@ -230,7 +237,7 @@
             document.getElementById('update-password-view').classList.add('hidden');
         }
 
-        // --- NEW PASSWORD LOGIC ---
+        // --- AUTH ACTIONS ---
         async function handlePasswordUpdate() {
             const newPassword = document.getElementById('new-password').value;
             const btn = document.getElementById('update-btn');
@@ -252,20 +259,17 @@
                 msg.classList.remove('hidden');
                 btn.innerText = "Update Password";
             } else {
-                alert("Success! Your password has been updated. Logging you in...");
-                
-                sessionStorage.setItem('itake_tab_session', 'true');
+                alert("Success! Logging you in...");
+                sessionStorage.setItem('itake_tab_session', 'true'); // Authorize this tab
                 window.history.replaceState(null, '', window.location.pathname);
                 showDashboard();
                 startInactivityTimer();
             }
         }
 
-        // --- LOGIN / RESET TOGGLE ---
         function toggleResetMode() {
             isResetMode = !isResetMode;
             isLoginMode = true;
-
             const title = document.getElementById('auth-title');
             const subtitle = document.getElementById('auth-subtitle');
             const btn = document.getElementById('submit-btn');
@@ -362,8 +366,15 @@
 
             // --- LOGIN / SIGNUP ---
             if (isLoginMode) {
+                // CRITICAL: We set the tab session key BEFORE Supabase finishes login.
+                // This ensures the Event Listener knows we intended to login.
+                sessionStorage.setItem('itake_tab_session', 'true');
+
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                
                 if (error) {
+                    // Login failed, remove the key so we don't accidentally authorize
+                    sessionStorage.removeItem('itake_tab_session');
                     errorMsg.innerText = error.message;
                     errorMsg.classList.remove('hidden');
                     btn.innerText = "Login";
@@ -390,8 +401,12 @@
         }
 
         async function handleLogout() {
-            stopInactivityTimer(); // Cleanup
+            stopInactivityTimer();
+            // 1. Destroy the Tab Key first
+            sessionStorage.removeItem('itake_tab_session');
+            // 2. Destroy the Supabase Session
             await supabaseClient.auth.signOut();
+            // 3. Force clean reload
             window.location.href = window.location.pathname; 
         }
 
